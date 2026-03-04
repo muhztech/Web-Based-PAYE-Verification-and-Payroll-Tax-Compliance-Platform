@@ -1,12 +1,51 @@
-<script>
 /* ================= GLOBAL STATE ================= */
 
 let selectedFile = null;
+let processedData = [];
 const previewContainer = document.getElementById('previewContainer');
+
+/* ================= TAX CONFIG ================= */
+
+const TAX_FREE = 800000;
+
+const TAX_BANDS = [
+  { limit: 2200000, rate: 0.15 },
+  { limit: 9000000, rate: 0.18 },
+  { limit: 13000000, rate: 0.21 },
+  { limit: 25000000, rate: 0.23 },
+  { limit: Infinity, rate: 0.25 }
+];
+
+/* ================= CORE TAX ENGINE ================= */
+
+function computePAYE(monthlyGross, monthlyPension = 0) {
+
+  const annualIncome = monthlyGross * 12;
+  const annualPension = monthlyPension * 12;
+  const taxableIncome = annualIncome - annualPension;
+
+  let tax = 0;
+
+  if (taxableIncome > TAX_FREE) {
+
+    let remaining = taxableIncome - TAX_FREE;
+
+    for (let band of TAX_BANDS) {
+
+      if (remaining <= 0) break;
+
+      const amount = Math.min(band.limit, remaining);
+      tax += amount * band.rate;
+      remaining -= amount;
+    }
+  }
+
+  return tax / 12; // Monthly PAYE
+}
 
 /* ================= PREVIEW FUNCTIONS ================= */
 
-function showPreviewFromFile(file){
+function showPreviewFromFile(file) {
   const reader = new FileReader();
   reader.onload = e => {
     previewContainer.innerHTML =
@@ -17,7 +56,7 @@ function showPreviewFromFile(file){
   reader.readAsDataURL(file);
 }
 
-function showPreviewFromBase64(base64){
+function showPreviewFromBase64(base64) {
   previewContainer.innerHTML =
     `<img src="data:image/png;base64,${base64}" 
           style="max-width:100%;border-radius:8px;" 
@@ -27,21 +66,21 @@ function showPreviewFromBase64(base64){
 /* ================= WEB INPUT HANDLERS ================= */
 
 document.getElementById('cameraInput')?.addEventListener('change', e => {
-  if(e.target.files.length){
+  if (e.target.files.length) {
     selectedFile = e.target.files[0];
     showPreviewFromFile(selectedFile);
   }
 });
 
 document.getElementById('galleryInput')?.addEventListener('change', e => {
-  if(e.target.files.length){
+  if (e.target.files.length) {
     selectedFile = e.target.files[0];
     showPreviewFromFile(selectedFile);
   }
 });
 
-function processSelectedFile(){
-  if(!selectedFile){
+function processSelectedFile() {
+  if (!selectedFile) {
     alert("Please take a photo or upload a payslip first!");
     return;
   }
@@ -49,14 +88,13 @@ function processSelectedFile(){
 }
 
 /* ================= FLUTTER BRIDGE ================= */
-/* Flutter calls this function */
 
-window.receiveFlutterImage = function(base64Image){
+window.receiveFlutterImage = function (base64Image) {
 
   try {
+
     showPreviewFromBase64(base64Image);
 
-    // Convert base64 → File (important fix)
     const byteCharacters = atob(base64Image);
     const byteNumbers = new Array(byteCharacters.length);
 
@@ -67,7 +105,6 @@ window.receiveFlutterImage = function(base64Image){
     const byteArray = new Uint8Array(byteNumbers);
     const blob = new Blob([byteArray], { type: "image/png" });
 
-    // Proper File object (CRITICAL FIX)
     selectedFile = new File([blob], "payslip.png", { type: "image/png" });
 
     processPayslip(selectedFile);
@@ -80,7 +117,7 @@ window.receiveFlutterImage = function(base64Image){
 
 /* ================= OCR PROCESS ================= */
 
-function processPayslip(file){
+function processPayslip(file) {
 
   document.getElementById("loading").innerText =
     "Reading payslip… please wait";
@@ -88,47 +125,61 @@ function processPayslip(file){
   Tesseract.recognize(file, 'eng', {
     logger: m => console.log(m)
   })
-  .then(({ data: { text } }) => {
+    .then(({ data: { text } }) => {
 
-    document.getElementById("loading").innerText = "";
+      document.getElementById("loading").innerText = "";
 
-    const cleanText = normalizeText(text);
-    console.log("OCR TEXT:", cleanText);
+      const cleanText = normalizeText(text);
 
-    let gross =
-      extractAmount(cleanText, GROSS_KEYWORDS) ||
-      sumComponents(cleanText);
+      let gross =
+        extractAmount(cleanText, GROSS_KEYWORDS) ||
+        sumComponents(cleanText);
 
-    let pension = extractAmount(cleanText, PENSION_KEYWORDS) || 0;
-    let currentPAYE =
-      extractAmount(cleanText, PAYE_KEYWORDS) || 0;
+      let pension =
+        extractAmount(cleanText, PENSION_KEYWORDS) || 0;
 
-    if(!gross){
-      alert(
-        "Could not confidently detect Gross Pay.\n" +
-        "Tip: ensure payslip is clear and well-lit."
-      );
-      return;
-    }
+      let currentPAYE =
+        extractAmount(cleanText, PAYE_KEYWORDS) || 0;
 
-    calculateNewPAYE(gross, pension, currentPAYE);
+      if (!gross) {
+        alert("Could not confidently detect Gross Pay.");
+        return;
+      }
 
-  })
-  .catch(err => {
-    console.error(err);
-    document.getElementById("loading").innerText = "";
-    alert("Error reading payslip. Please try again.");
-  });
+      const newPAYE = computePAYE(gross, pension);
+      const difference = currentPAYE - newPAYE;
+
+      displayResult(gross, pension, currentPAYE, newPAYE, difference);
+    })
+    .catch(err => {
+      console.error(err);
+      document.getElementById("loading").innerText = "";
+      alert("Error reading payslip.");
+    });
+}
+
+/* ================= DISPLAY RESULT ================= */
+
+function displayResult(gross, pension, oldPAYE, newPAYE, difference) {
+
+  document.getElementById("result").innerHTML = `
+    <p><b>Detected Gross Pay:</b> ₦${gross.toLocaleString()}</p>
+    <p><b>Detected Pension:</b> ₦${pension.toLocaleString()}</p>
+    <p><b>Current PAYE:</b> ₦${oldPAYE.toLocaleString()}</p>
+    <hr>
+    <p><b>Correct PAYE (New Law):</b> ₦${newPAYE.toLocaleString()}</p>
+    <p><b>Difference:</b> ₦${difference.toLocaleString()}</p>
+  `;
 }
 
 /* ================= TEXT NORMALIZATION ================= */
 
-function normalizeText(text){
+function normalizeText(text) {
   return text
     .toUpperCase()
-    .replace(/₦/g,"")
-    .replace(/\s+/g," ")
-    .replace(/,/g,"");
+    .replace(/₦/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/,/g, "");
 }
 
 /* ================= KEYWORDS ================= */
@@ -156,22 +207,20 @@ const PAYE_KEYWORDS = [
 
 /* ================= AMOUNT EXTRACTION ================= */
 
-function extractAmount(text, keywords){
-  for(let key of keywords){
+function extractAmount(text, keywords) {
+  for (let key of keywords) {
     const regex = new RegExp(
       key + "[^0-9]{0,25}([0-9]{2,9}(?:\\.\\d{2})?)"
     );
     const match = text.match(regex);
-    if(match){
-      return Number(match[1]);
-    }
+    if (match) return Number(match[1]);
   }
   return null;
 }
 
-/* ================= FALLBACK: SUM COMPONENTS ================= */
+/* ================= FALLBACK SUM ================= */
 
-function sumComponents(text){
+function sumComponents(text) {
 
   let total = 0;
 
@@ -185,14 +234,14 @@ function sumComponents(text){
     "ALLOWANCE"
   ];
 
-  for(let comp of components){
+  for (let comp of components) {
 
     const regex =
-      new RegExp(comp + "[^0-9]{0,25}([0-9]{2,9})","g");
+      new RegExp(comp + "[^0-9]{0,25}([0-9]{2,9})", "g");
 
     let match;
 
-    while((match = regex.exec(text)) !== null){
+    while ((match = regex.exec(text)) !== null) {
       total += Number(match[1]);
     }
   }
@@ -200,49 +249,87 @@ function sumComponents(text){
   return total > 0 ? total : null;
 }
 
-/* ================= PAYE CALCULATION ================= */
+/* ================= BULK EXCEL PROCESSING ================= */
 
-function calculateNewPAYE(monthlyGross, pensionMonthly, currentPAYE){
+function processExcel() {
 
-  const annualIncome = monthlyGross * 12;
-  const pensionAnnual = pensionMonthly * 12;
-  const taxableIncome = annualIncome - pensionAnnual;
+  const file = document.getElementById("excelFile")?.files[0];
 
-  let tax = 0;
-
-  if(taxableIncome > 800000){
-
-    let remaining = taxableIncome - 800000;
-
-    const bands = [
-      { limit: 2200000, rate: 0.15 },
-      { limit: 9000000, rate: 0.18 },
-      { limit: 13000000, rate: 0.21 },
-      { limit: 25000000, rate: 0.23 },
-      { limit: Infinity, rate: 0.25 }
-    ];
-
-    for(let band of bands){
-
-      if(remaining <= 0) break;
-
-      let amount = Math.min(band.limit, remaining);
-
-      tax += amount * band.rate;
-      remaining -= amount;
-    }
+  if (!file) {
+    alert("Upload Excel file first.");
+    return;
   }
 
-  const monthlyNewPAYE = tax / 12;
-  const difference = currentPAYE - monthlyNewPAYE;
+  const reader = new FileReader();
 
-  document.getElementById("result").innerHTML = `
-    <p><b>Detected Gross Pay:</b> ₦${monthlyGross.toLocaleString()}</p>
-    <p><b>Detected Pension:</b> ₦${pensionMonthly.toLocaleString()}</p>
-    <p><b>Current PAYE:</b> ₦${currentPAYE.toLocaleString()}</p>
-    <hr>
-    <p><b>Correct PAYE (New Law):</b> ₦${monthlyNewPAYE.toLocaleString()}</p>
-    <p><b>Difference:</b> ₦${difference.toLocaleString()}</p>
-  `;
+  reader.onload = function (e) {
+
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: 'array' });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(sheet);
+
+    processedData = json.map(row => {
+
+      const gross = Number(row["Gross Salary"]) || 0;
+      const pension = Number(row["Pension"]) || 0;
+      const oldPAYE = Number(row["Old PAYE"]) || 0;
+
+      const newPAYE = computePAYE(gross, pension);
+      const difference = oldPAYE - newPAYE;
+
+      return {
+        ...row,
+        "New PAYE": newPAYE,
+        "Difference": difference
+      };
+    });
+
+    previewExcel(processedData);
+  };
+
+  reader.readAsArrayBuffer(file);
 }
-</script>
+
+/* ================= EXCEL PREVIEW ================= */
+
+function previewExcel(data) {
+
+  const container = document.getElementById("excelPreview");
+  if (!container || data.length === 0) return;
+
+  let html = "<table><tr>";
+
+  Object.keys(data[0]).forEach(k => {
+    html += `<th>${k}</th>`;
+  });
+
+  html += "</tr>";
+
+  data.slice(0, 20).forEach(row => {
+    html += "<tr>";
+    Object.values(row).forEach(v => {
+      html += `<td>${v}</td>`;
+    });
+    html += "</tr>";
+  });
+
+  html += "</table>";
+  container.innerHTML = html;
+}
+
+/* ================= DOWNLOAD EXCEL ================= */
+
+function downloadExcel() {
+
+  if (!processedData.length) {
+    alert("No processed data to download.");
+    return;
+  }
+
+  const ws = XLSX.utils.json_to_sheet(processedData);
+  const wb = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(wb, ws, "Processed Payroll");
+  XLSX.writeFile(wb, "Processed_PAYE.xlsx");
+}
