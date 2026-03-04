@@ -9,7 +9,7 @@ const result = document.getElementById("result");
 
 /* ================= TAX CONFIG ================= */
 
-const TAX_FREE = 800000; // Annual tax free threshold
+const TAX_FREE = 800000;
 
 const TAX_BANDS = [
   { band: 2200000, rate: 0.15 },
@@ -27,7 +27,6 @@ function computePAYE(monthlyGross, monthlyPension = 0) {
 
   const annualIncome = monthlyGross * 12;
   const annualPension = monthlyPension * 12;
-
   const taxableIncome = Math.max(annualIncome - annualPension, 0);
 
   if (taxableIncome <= TAX_FREE) return 0;
@@ -36,7 +35,6 @@ function computePAYE(monthlyGross, monthlyPension = 0) {
   let tax = 0;
 
   for (let band of TAX_BANDS) {
-
     if (remaining <= 0) break;
 
     const amount = Math.min(band.band, remaining);
@@ -47,7 +45,7 @@ function computePAYE(monthlyGross, monthlyPension = 0) {
   return tax / 12;
 }
 
-/* ================= PREVIEW HANDLING ================= */
+/* ================= PREVIEW ================= */
 
 function showPreview(file) {
   const reader = new FileReader();
@@ -81,7 +79,6 @@ function processSelectedFile() {
     alert("Upload payslip first");
     return;
   }
-
   processPayslip(selectedFile);
 }
 
@@ -90,7 +87,6 @@ function processSelectedFile() {
 window.receiveFlutterImage = function (base64Image) {
 
   try {
-
     previewContainer.innerHTML =
       `<img src="data:image/png;base64,${base64Image}" 
              style="max-width:100%;border-radius:8px;">`;
@@ -134,7 +130,7 @@ function processPayslip(file) {
       return;
     }
 
-    console.log("OCR TEXT:", text);
+    console.log("RAW OCR TEXT:\n", text);
 
     const clean = normalizeText(text);
 
@@ -146,7 +142,7 @@ function processPayslip(file) {
       extractAmount(clean, PENSION_KEYWORDS) || 0;
 
     const oldPAYE =
-      extractAmount(clean, PAYE_KEYWORDS) || 0;
+      extractPAYE(clean);
 
     if (!gross || gross <= 0) {
       result.innerHTML = "⚠ Gross Pay not detected.";
@@ -173,20 +169,22 @@ function displayResult(gross, pension, oldPAYE, newPAYE, diff) {
   result.innerHTML = `
     <p><b>Detected Gross Pay:</b> ₦${gross.toLocaleString()}</p>
     <p><b>Detected Pension:</b> ₦${pension.toLocaleString()}</p>
-    <p><b>Current PAYE:</b> ₦${oldPAYE.toLocaleString()}</p>
+    <p><b>Detected PAYE (Slip):</b> ₦${oldPAYE.toLocaleString()}</p>
     <hr>
-    <p><b>Correct PAYE:</b> ₦${newPAYE.toLocaleString()}</p>
+    <p><b>Recomputed PAYE:</b> ₦${newPAYE.toLocaleString()}</p>
     <p><b>Difference:</b> ₦${diff.toLocaleString()}</p>
   `;
 }
 
-/* ================= TEXT CLEANING ================= */
+/* ================= TEXT NORMALIZATION ================= */
 
 function normalizeText(text) {
   return text
     .toUpperCase()
     .replace(/₦/g, "")
     .replace(/,/g, "")
+    .replace(/S/g, "5")
+    .replace(/O/g, "0")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -198,8 +196,7 @@ const GROSS_KEYWORDS = [
   "GROSS SALARY",
   "TOTAL EMOLUMENT",
   "TOTAL PAY",
-  "TOTAL EARNINGS",
-  "GROSS"
+  "TOTAL EARNINGS"
 ];
 
 const PENSION_KEYWORDS = [
@@ -208,11 +205,28 @@ const PENSION_KEYWORDS = [
   "RETIREMENT"
 ];
 
-const PAYE_KEYWORDS = [
-  "PAYE",
-  "PAY AS YOU EARN",
-  "TAX"
-];
+/* ================= SMART PAYE DETECTOR ================= */
+
+function extractPAYE(text) {
+
+  // Prioritize PAYE TAX
+  const priority = [
+    "PAYE TAX",
+    "PAYE",
+    "PAY AS YOU EARN"
+  ];
+
+  for (let key of priority) {
+    const regex = new RegExp(
+      key + "\\s*[:\\-]?\\s*([0-9]{2,12}(?:\\.\\d{2})?)"
+    );
+
+    const match = text.match(regex);
+    if (match) return Number(match[1]);
+  }
+
+  return 0;
+}
 
 /* ================= AMOUNT EXTRACTION ================= */
 
@@ -225,14 +239,13 @@ function extractAmount(text, keywords) {
     );
 
     const match = text.match(regex);
-
     if (match) return Number(match[1]);
   }
 
   return null;
 }
 
-/* ================= FALLBACK COMPONENT SUM ================= */
+/* ================= FALLBACK SUM ================= */
 
 function sumComponents(text) {
 
