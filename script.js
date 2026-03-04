@@ -20,6 +20,8 @@ const TAX_BANDS = [
 
 function computePAYE(monthlyGross, monthlyPension = 0) {
 
+  if (!monthlyGross || monthlyGross <= 0) return 0;
+
   const annualIncome = monthlyGross * 12;
   const annualPension = monthlyPension * 12;
   const taxableIncome = annualIncome - annualPension;
@@ -40,30 +42,21 @@ function computePAYE(monthlyGross, monthlyPension = 0) {
     }
   }
 
-  return tax / 12; // Monthly PAYE
+  return tax / 12;
 }
 
-/* ================= PREVIEW FUNCTIONS ================= */
+/* ================= FILE PREVIEW ================= */
 
 function showPreviewFromFile(file) {
   const reader = new FileReader();
   reader.onload = e => {
     previewContainer.innerHTML =
-      `<img src="${e.target.result}" 
-            style="max-width:100%;border-radius:8px;" 
-            alt="Payslip Preview">`;
+      `<img src="${e.target.result}" style="max-width:100%;border-radius:8px;">`;
   };
   reader.readAsDataURL(file);
 }
 
-function showPreviewFromBase64(base64) {
-  previewContainer.innerHTML =
-    `<img src="data:image/png;base64,${base64}" 
-          style="max-width:100%;border-radius:8px;" 
-          alt="Payslip Preview">`;
-}
-
-/* ================= WEB INPUT HANDLERS ================= */
+/* ================= INPUT HANDLERS ================= */
 
 document.getElementById('cameraInput')?.addEventListener('change', e => {
   if (e.target.files.length) {
@@ -81,68 +74,50 @@ document.getElementById('galleryInput')?.addEventListener('change', e => {
 
 function processSelectedFile() {
   if (!selectedFile) {
-    alert("Please take a photo or upload a payslip first!");
+    alert("Upload or capture payslip first.");
     return;
   }
   processPayslip(selectedFile);
 }
 
-/* ================= FLUTTER BRIDGE ================= */
-
-window.receiveFlutterImage = function (base64Image) {
-
-  try {
-
-    showPreviewFromBase64(base64Image);
-
-    const byteCharacters = atob(base64Image);
-    const byteNumbers = new Array(byteCharacters.length);
-
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-
-    const byteArray = new Uint8Array(byteNumbers);
-    const blob = new Blob([byteArray], { type: "image/png" });
-
-    selectedFile = new File([blob], "payslip.png", { type: "image/png" });
-
-    processPayslip(selectedFile);
-
-  } catch (err) {
-    console.error("Flutter image error:", err);
-    alert("Failed to process image from mobile app.");
-  }
-};
-
 /* ================= OCR PROCESS ================= */
 
 function processPayslip(file) {
 
-  document.getElementById("loading").innerText =
-    "Reading payslip… please wait";
+  const loading = document.getElementById("loading");
+  const resultBox = document.getElementById("result");
+
+  loading.innerText = "Reading payslip... please wait";
 
   Tesseract.recognize(file, 'eng', {
     logger: m => console.log(m)
   })
     .then(({ data: { text } }) => {
 
-      document.getElementById("loading").innerText = "";
+      loading.innerText = "";
+
+      if (!text || text.length < 20) {
+        resultBox.innerHTML = "⚠ OCR could not read text clearly.";
+        return;
+      }
+
+      console.log("OCR RAW TEXT:", text);
 
       const cleanText = normalizeText(text);
 
-      let gross =
+      const gross =
         extractAmount(cleanText, GROSS_KEYWORDS) ||
         sumComponents(cleanText);
 
-      let pension =
+      const pension =
         extractAmount(cleanText, PENSION_KEYWORDS) || 0;
 
-      let currentPAYE =
+      const currentPAYE =
         extractAmount(cleanText, PAYE_KEYWORDS) || 0;
 
-      if (!gross) {
-        alert("Could not confidently detect Gross Pay.");
+      if (!gross || gross <= 0) {
+        resultBox.innerHTML =
+          "⚠ Gross Pay not confidently detected. Try clearer image.";
         return;
       }
 
@@ -152,9 +127,9 @@ function processPayslip(file) {
       displayResult(gross, pension, currentPAYE, newPAYE, difference);
     })
     .catch(err => {
-      console.error(err);
-      document.getElementById("loading").innerText = "";
-      alert("Error reading payslip.");
+      console.error("OCR ERROR:", err);
+      loading.innerText = "";
+      resultBox.innerHTML = "❌ Error processing payslip.";
     });
 }
 
@@ -178,8 +153,9 @@ function normalizeText(text) {
   return text
     .toUpperCase()
     .replace(/₦/g, "")
+    .replace(/,/g, "")
     .replace(/\s+/g, " ")
-    .replace(/,/g, "");
+    .trim();
 }
 
 /* ================= KEYWORDS ================= */
@@ -201,24 +177,33 @@ const PENSION_KEYWORDS = [
 
 const PAYE_KEYWORDS = [
   "PAYE",
-  "PAY AS YOU EARN",
-  "TAX"
+  "PAY AS YOU EARN"
 ];
 
-/* ================= AMOUNT EXTRACTION ================= */
+/* ================= SMART AMOUNT EXTRACTION ================= */
 
 function extractAmount(text, keywords) {
+
   for (let key of keywords) {
+
     const regex = new RegExp(
-      key + "[^0-9]{0,25}([0-9]{2,9}(?:\\.\\d{2})?)"
+      key + "[^0-9]{0,30}([0-9]+(?:\\.[0-9]{1,2})?)"
     );
+
     const match = text.match(regex);
-    if (match) return Number(match[1]);
+
+    if (match) {
+      const value = Number(match[1]);
+      if (!isNaN(value) && value > 0) {
+        return value;
+      }
+    }
   }
+
   return null;
 }
 
-/* ================= FALLBACK SUM ================= */
+/* ================= FALLBACK COMPONENT SUM ================= */
 
 function sumComponents(text) {
 
@@ -237,7 +222,7 @@ function sumComponents(text) {
   for (let comp of components) {
 
     const regex =
-      new RegExp(comp + "[^0-9]{0,25}([0-9]{2,9})", "g");
+      new RegExp(comp + "[^0-9]{0,30}([0-9]+)", "g");
 
     let match;
 
@@ -247,89 +232,4 @@ function sumComponents(text) {
   }
 
   return total > 0 ? total : null;
-}
-
-/* ================= BULK EXCEL PROCESSING ================= */
-
-function processExcel() {
-
-  const file = document.getElementById("excelFile")?.files[0];
-
-  if (!file) {
-    alert("Upload Excel file first.");
-    return;
-  }
-
-  const reader = new FileReader();
-
-  reader.onload = function (e) {
-
-    const data = new Uint8Array(e.target.result);
-    const workbook = XLSX.read(data, { type: 'array' });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const json = XLSX.utils.sheet_to_json(sheet);
-
-    processedData = json.map(row => {
-
-      const gross = Number(row["Gross Salary"]) || 0;
-      const pension = Number(row["Pension"]) || 0;
-      const oldPAYE = Number(row["Old PAYE"]) || 0;
-
-      const newPAYE = computePAYE(gross, pension);
-      const difference = oldPAYE - newPAYE;
-
-      return {
-        ...row,
-        "New PAYE": newPAYE,
-        "Difference": difference
-      };
-    });
-
-    previewExcel(processedData);
-  };
-
-  reader.readAsArrayBuffer(file);
-}
-
-/* ================= EXCEL PREVIEW ================= */
-
-function previewExcel(data) {
-
-  const container = document.getElementById("excelPreview");
-  if (!container || data.length === 0) return;
-
-  let html = "<table><tr>";
-
-  Object.keys(data[0]).forEach(k => {
-    html += `<th>${k}</th>`;
-  });
-
-  html += "</tr>";
-
-  data.slice(0, 20).forEach(row => {
-    html += "<tr>";
-    Object.values(row).forEach(v => {
-      html += `<td>${v}</td>`;
-    });
-    html += "</tr>";
-  });
-
-  html += "</table>";
-  container.innerHTML = html;
-}
-
-/* ================= DOWNLOAD EXCEL ================= */
-
-function downloadExcel() {
-
-  if (!processedData.length) {
-    alert("No processed data to download.");
-    return;
-  }
-
-  const ws = XLSX.utils.json_to_sheet(processedData);
-  const wb = XLSX.utils.book_new();
-
-  XLSX.utils.book_append_sheet(wb, ws, "Processed Payroll");
-  XLSX.writeFile(wb, "Processed_PAYE.xlsx");
 }
