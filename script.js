@@ -1,4 +1,4 @@
-/* ================= GLOBAL STATE ================= */
+/* ================= GLOBAL ================= */
 
 let selectedFile = null;
 let processedData = [];
@@ -11,13 +11,8 @@ const result = document.getElementById("result");
 
 function openTab(id, el) {
 
-  document.querySelectorAll(".tab").forEach(t =>
-    t.classList.remove("active")
-  );
-
-  document.querySelectorAll(".tab-content").forEach(c =>
-    c.classList.remove("active")
-  );
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
 
   el.classList.add("active");
   document.getElementById(id).classList.add("active");
@@ -35,7 +30,7 @@ const TAX_BANDS = [
   { limit: Infinity, rate: 0.25 }
 ];
 
-/* ================= CORE TAX ENGINE ================= */
+/* ================= TAX ENGINE ================= */
 
 function computePAYE(monthlyGross, pension = 0, nhf = 0, nhis = 0, other = 0) {
 
@@ -43,29 +38,39 @@ function computePAYE(monthlyGross, pension = 0, nhf = 0, nhis = 0, other = 0) {
 
   const annualIncome = monthlyGross * 12;
 
-  const annualDeductions =
-    (pension + nhf + nhis + other) * 12;
+  const annualDeductions = (pension + nhf + nhis + other) * 12;
 
-  let taxableIncome =
-    annualIncome - annualDeductions - TAX_FREE;
-
-  taxableIncome = Math.max(taxableIncome, 0);
+  let taxable = Math.max(annualIncome - annualDeductions - TAX_FREE, 0);
 
   let tax = 0;
 
   for (let band of TAX_BANDS) {
 
-    if (taxableIncome <= 0) break;
+    if (taxable <= 0) break;
 
-    const amount = Math.min(band.limit, taxableIncome);
+    let amount = Math.min(band.limit, taxable);
 
     tax += amount * band.rate;
 
-    taxableIncome -= amount;
+    taxable -= amount;
   }
 
   return tax / 12;
 }
+
+/* ================= FILE INPUT ================= */
+
+galleryInput.onchange = e => {
+
+  selectedFile = e.target.files[0];
+  preview(selectedFile);
+};
+
+cameraInput.onchange = e => {
+
+  selectedFile = e.target.files[0];
+  preview(selectedFile);
+};
 
 /* ================= IMAGE PREVIEW ================= */
 
@@ -73,86 +78,58 @@ function preview(file) {
 
   const reader = new FileReader();
 
-  reader.onload = function (e) {
+  reader.onload = e => {
 
     previewContainer.innerHTML =
-      `<img src="${e.target.result}"
-      style="max-width:100%;border-radius:8px;">`;
+      `<img src="${e.target.result}" style="max-width:100%;border-radius:8px;">`;
 
   };
 
   reader.readAsDataURL(file);
 }
 
-/* ================= INPUT HANDLERS ================= */
-
-const galleryInput = document.getElementById("galleryInput");
-const cameraInput = document.getElementById("cameraInput");
-
-if (galleryInput) {
-  galleryInput.onchange = e => {
-    selectedFile = e.target.files[0];
-    preview(selectedFile);
-  };
-}
-
-if (cameraInput) {
-  cameraInput.onchange = e => {
-    selectedFile = e.target.files[0];
-    preview(selectedFile);
-  };
-}
-
-/* ================= PROCESS PAYSLIP ================= */
+/* ================= OCR PROCESS ================= */
 
 function processSelectedFile() {
 
   if (!selectedFile) {
+
     alert("Upload payslip first");
     return;
   }
 
   loading.innerText = "Reading payslip...";
 
-  Tesseract.recognize(selectedFile, "eng")
+  Tesseract.recognize(selectedFile, 'eng')
 
     .then(({ data: { text } }) => {
 
       loading.innerText = "";
 
-      const clean =
-        text.toUpperCase().replace(/₦|,/g, "");
+      const clean = text.toUpperCase().replace(/₦|,/g, "");
 
-      const gross =
-        extract(clean, ["GROSS PAY", "TOTAL PAY", "GROSS"]);
+      const gross = extract(clean, ["GROSS", "TOTAL PAY"]);
+      const pension = extract(clean, ["PENSION"]) || 0;
+      const paye = extract(clean, ["PAYE", "TAX"]) || 0;
 
-      const pension =
-        extract(clean, ["PENSION"]) || 0;
-
-      const paye =
-        extract(clean, ["PAYE", "PAYE TAX", "TAX"]) || 0;
-
-      const newPAYE =
-        computePAYE(gross, pension);
+      const newPAYE = computePAYE(gross, pension);
 
       result.innerHTML = `
-      <p><b>Gross:</b> ₦${gross}</p>
-      <p><b>Pension:</b> ₦${pension}</p>
-      <p><b>PAYE (Slip):</b> ₦${paye}</p>
-      <hr>
-      <p><b>Recomputed PAYE:</b> ₦${newPAYE.toLocaleString()}</p>
+      <b>Gross:</b> ₦${gross}<br>
+      <b>Pension:</b> ₦${pension}<br>
+      <b>Old PAYE:</b> ₦${paye}<hr>
+      <b>New PAYE:</b> ₦${newPAYE.toLocaleString()}
       `;
     });
 }
 
-/* ================= TEXT EXTRACTION ================= */
+/* ================= TEXT EXTRACT ================= */
 
 function extract(text, keywords) {
 
   for (let key of keywords) {
 
-    let regex =
-      new RegExp(key + "\\s*[:\\-]?\\s*([0-9]{2,12})");
+    let regex = new RegExp(key + "\\s*[:\\-]?\\s*([0-9]{2,12})");
 
     let match = text.match(regex);
 
@@ -166,67 +143,47 @@ function extract(text, keywords) {
 
 function calculatePIT() {
 
-  const gross =
-    Number(document.getElementById("pitGross").value);
+  const gross = Number(pitGross.value);
+  const exp = Number(pitExpenses.value);
 
-  const exp =
-    Number(document.getElementById("pitExpenses").value);
+  const newPAYE = computePAYE(gross, 0, 0, 0, exp);
 
-  const newPAYE =
-    computePAYE(gross, 0, 0, 0, exp);
-
-  document.getElementById("pitResult").innerHTML =
-    `Monthly PIT: ₦${newPAYE.toLocaleString()}`;
+  pitResult.innerHTML =
+    `<b>Monthly PIT:</b> ₦${newPAYE.toLocaleString()}`;
 }
 
-/* ================= EXCEL PROCESSING ================= */
+/* ================= EXCEL PROCESS ================= */
 
 function processExcel() {
 
-  const file =
-    document.getElementById("excelFile").files[0];
+  const file = excelFile.files[0];
 
   if (!file) {
-    alert("Upload Excel file first");
+
+    alert("Upload Excel file");
     return;
   }
 
   const reader = new FileReader();
 
-  reader.onload = function (e) {
+  reader.onload = e => {
 
-    const wb =
-      XLSX.read(new Uint8Array(e.target.result),
-        { type: "array" });
+    const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
 
-    const sheet =
-      wb.Sheets[wb.SheetNames[0]];
+    const sheet = wb.Sheets[wb.SheetNames[0]];
 
-    const json =
-      XLSX.utils.sheet_to_json(sheet);
+    const json = XLSX.utils.sheet_to_json(sheet);
 
     processedData = json.map(r => {
 
-      const gross =
-        Number(r["Gross Salary"]) || 0;
+      const gross = Number(r["Gross Salary"]) || 0;
+      const pension = Number(r["Pension"]) || 0;
+      const nhf = Number(r["NHF"]) || 0;
+      const nhis = Number(r["NHIS"]) || 0;
+      const other = Number(r["Other Deductions"]) || 0;
+      const oldPAYE = Number(r["Old PAYE"]) || 0;
 
-      const pension =
-        Number(r["Pension"]) || 0;
-
-      const nhf =
-        Number(r["NHF"]) || 0;
-
-      const nhis =
-        Number(r["NHIS"]) || 0;
-
-      const other =
-        Number(r["Other Deductions"]) || 0;
-
-      const oldPAYE =
-        Number(r["Old PAYE"]) || 0;
-
-      const newPAYE =
-        computePAYE(gross, pension, nhf, nhis, other);
+      const newPAYE = computePAYE(gross, pension, nhf, nhis, other);
 
       return {
         ...r,
@@ -237,8 +194,7 @@ function processExcel() {
 
     previewExcel(processedData);
 
-    document.getElementById("downloadBtn").style.display =
-      "block";
+    downloadBtn.style.display = "block";
   };
 
   reader.readAsArrayBuffer(file);
@@ -250,22 +206,21 @@ function previewExcel(data) {
 
   if (!data.length) return;
 
-  const container =
-    document.getElementById("excelPreview");
-
-  let html = "<table border='1'><tr>";
+  let html = "<table><tr>";
 
   Object.keys(data[0]).forEach(k => {
+
     html += `<th>${k}</th>`;
   });
 
   html += "</tr>";
 
-  data.slice(0, 20).forEach(row => {
+  data.forEach(row => {
 
     html += "<tr>";
 
     Object.values(row).forEach(v => {
+
       html += `<td>${v}</td>`;
     });
 
@@ -274,32 +229,18 @@ function previewExcel(data) {
 
   html += "</table>";
 
-  container.innerHTML = html;
+  excelPreview.innerHTML = html;
 }
 
 /* ================= DOWNLOAD EXCEL ================= */
 
 function downloadExcel() {
 
-  if (!processedData.length) {
-    alert("No processed data");
-    return;
-  }
+  const ws = XLSX.utils.json_to_sheet(processedData);
 
-  const ws =
-    XLSX.utils.json_to_sheet(processedData);
+  const wb = XLSX.utils.book_new();
 
-  const wb =
-    XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Processed");
 
-  XLSX.utils.book_append_sheet(
-    wb,
-    ws,
-    "Processed Payroll"
-  );
-
-  XLSX.writeFile(
-    wb,
-    "Processed_PAYE.xlsx"
-  );
+  XLSX.writeFile(wb, "Processed_PAYE.xlsx");
 }
