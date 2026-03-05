@@ -111,43 +111,19 @@ function processSelectedFile() {
       const clean = normalizeText(text);
 
       const gross =
-        extractAmount(clean, [
-          "GROSS PAY",
-          "GROSS SALARY",
-          "TOTAL PAY",
-          "TOTAL EARNINGS",
-          "GROSS"
-        ]);
+        extractAmount(clean, ["GROSS PAY", "GROSS SALARY", "TOTAL PAY", "TOTAL EARNINGS"]);
 
       const pension =
-        extractAmount(clean, [
-          "PENSION",
-          "PFA",
-          "RETIREMENT"
-        ]) || 0;
+        extractAmount(clean, ["PENSION", "PFA"]) || 0;
 
       const nhf =
-        extractAmount(clean, [
-          "NHF",
-          "NATIONAL HOUSING",
-          "HOUSING FUND"
-        ]) || 0;
+        extractAmount(clean, ["NHF", "NATIONAL HOUSING"]) || 0;
 
       const nhis =
-        extractAmount(clean, [
-          "NHIS",
-          "HEALTH INSURANCE"
-        ]) || 0;
+        extractAmount(clean, ["NHIS", "HEALTH INSURANCE"]) || 0;
 
       const paye =
-        extractAmount(clean, [
-          "PAYE",
-          "PAYE TAX",
-          "PAY AS YOU EARN",
-          "PAY-AS-YOU-EARN",
-          "TAX",
-          "STATUTORY TAX"
-        ]) || 0;
+        extractAmount(clean, ["PAYE", "PAYE TAX", "PAY AS YOU EARN"]) || 0;
 
       if (!gross) {
 
@@ -177,35 +153,24 @@ function normalizeText(text) {
   return text
     .toUpperCase()
     .replace(/₦/g, "")
-    .replace(/NGN/g, "")
     .replace(/,/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-/* ================= SMART AMOUNT EXTRACTOR ================= */
+/* ================= AMOUNT EXTRACTOR ================= */
 
 function extractAmount(text, keywords) {
 
   for (let key of keywords) {
 
-    // Pattern 1: LABEL 12345
-    let regex1 = new RegExp(key + "\\s*[:\\-]?\\s*([0-9]+(?:\\.[0-9]{1,2})?)");
-    let match1 = text.match(regex1);
+    const regex = new RegExp(
+      key + "\\s*[:\\-]?\\s*([0-9]+(?:\\.[0-9]{1,2})?)"
+    );
 
-    if (match1) return Number(match1[1]);
+    const match = text.match(regex);
 
-    // Pattern 2: 12345 LABEL
-    let regex2 = new RegExp("([0-9]+(?:\\.[0-9]{1,2})?)\\s*" + key);
-    let match2 = text.match(regex2);
-
-    if (match2) return Number(match2[1]);
-
-    // Pattern 3: LABEL ... 12345
-    let regex3 = new RegExp(key + "[^0-9]{0,15}([0-9]+(?:\\.[0-9]{1,2})?)");
-    let match3 = text.match(regex3);
-
-    if (match3) return Number(match3[1]);
+    if (match) return Number(match[1]);
   }
 
   return null;
