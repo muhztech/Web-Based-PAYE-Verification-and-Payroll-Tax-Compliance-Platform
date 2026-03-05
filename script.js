@@ -111,19 +111,45 @@ function processSelectedFile() {
       const clean = normalizeText(text);
 
       const gross =
-        extractAmount(clean, ["GROSS PAY", "GROSS SALARY", "TOTAL PAY", "TOTAL EARNINGS"]);
+        extractAmount(clean, [
+          "GROSS PAY",
+          "GROSS SALARY",
+          "TOTAL PAY",
+          "TOTAL EARNINGS"
+        ]);
 
       const pension =
-        extractAmount(clean, ["PENSION", "PFA"]) || 0;
+        extractAmount(clean, [
+          "PENSION",
+          "PFA",
+          "RETIREMENT"
+        ]) || 0;
 
       const nhf =
-        extractAmount(clean, ["NHF", "NATIONAL HOUSING"]) || 0;
+        extractAmount(clean, [
+          "NHF",
+          "N H F",
+          "N.H.F",
+          "NHF CONTRIBUTION",
+          "NATIONAL HOUSING FUND",
+          "HOUSING FUND",
+          "HOUSING"
+        ]) || 0;
 
       const nhis =
-        extractAmount(clean, ["NHIS", "HEALTH INSURANCE"]) || 0;
+        extractAmount(clean, [
+          "NHIS",
+          "HEALTH INSURANCE",
+          "NATIONAL HEALTH"
+        ]) || 0;
 
       const paye =
-        extractAmount(clean, ["PAYE", "PAYE TAX", "PAY AS YOU EARN"]) || 0;
+        extractAmount(clean, [
+          "PAYE",
+          "PAYE TAX",
+          "PAY AS YOU EARN",
+          "TAX"
+        ]) || 0;
 
       if (!gross) {
 
@@ -170,7 +196,14 @@ function extractAmount(text, keywords) {
 
     const match = text.match(regex);
 
-    if (match) return Number(match[1]);
+    if (match) {
+
+      const value = Number(match[1]);
+
+      if (!isNaN(value)) {
+        return value;
+      }
+    }
   }
 
   return null;
