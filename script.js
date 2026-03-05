@@ -37,7 +37,6 @@ function computePAYE(monthlyGross, pension = 0, nhf = 0, nhis = 0, other = 0) {
   if (!monthlyGross) return 0;
 
   const annualIncome = monthlyGross * 12;
-
   const annualDeductions = (pension + nhf + nhis + other) * 12;
 
   let taxable = Math.max(annualIncome - annualDeductions - TAX_FREE, 0);
@@ -100,40 +99,98 @@ function processSelectedFile() {
 
   loading.innerText = "Reading payslip...";
 
-  Tesseract.recognize(selectedFile, 'eng')
+  Tesseract.recognize(selectedFile, 'eng', {
+    logger: m => console.log(m)
+  })
 
-    .then(({ data: { text } }) => {
+  .then(({ data: { text } }) => {
 
-      loading.innerText = "";
+    loading.innerText = "";
 
-      const clean = text.toUpperCase().replace(/₦|,/g, "");
+    console.log("RAW OCR TEXT:\n", text);
 
-      const gross = extract(clean, ["GROSS", "TOTAL PAY"]);
-      const pension = extract(clean, ["PENSION"]) || 0;
-      const paye = extract(clean, ["PAYE", "TAX"]) || 0;
+    const clean = normalizeText(text);
 
-      const newPAYE = computePAYE(gross, pension);
+    const lines = clean.split("\n");
 
-      result.innerHTML = `
-      <b>Gross:</b> ₦${gross}<br>
-      <b>Pension:</b> ₦${pension}<br>
-      <b>Old PAYE:</b> ₦${paye}<hr>
-      <b>New PAYE:</b> ₦${newPAYE.toLocaleString()}
-      `;
-    });
+    const gross = extractLineAmount(lines, [
+      "GROSS PAY",
+      "GROSS SALARY"
+    ]);
+
+    const pension = extractLineAmount(lines, [
+      "PENSION",
+      "PFA"
+    ]) || 0;
+
+    const nhf = extractLineAmount(lines, [
+      "NHF",
+      "HOUSING FUND"
+    ]) || 0;
+
+    const nhis = extractLineAmount(lines, [
+      "NHIS",
+      "HEALTH INSURANCE"
+    ]) || 0;
+
+    const paye = extractLineAmount(lines, [
+      "PAYE TAX",
+      "PAYE",
+      "PAY AS YOU EARN"
+    ]) || 0;
+
+    if (!gross) {
+
+      result.innerHTML = "⚠ Gross Pay not detected.";
+      return;
+    }
+
+    const newPAYE = computePAYE(gross, pension, nhf, nhis);
+
+    result.innerHTML = `
+      <b>Gross:</b> ₦${gross.toLocaleString()}<br>
+      <b>Pension:</b> ₦${pension.toLocaleString()}<br>
+      <b>NHF:</b> ₦${nhf.toLocaleString()}<br>
+      <b>NHIS:</b> ₦${nhis.toLocaleString()}<br>
+      <b>Old PAYE:</b> ₦${paye.toLocaleString()}
+      <hr>
+      <b>Recomputed PAYE:</b> ₦${newPAYE.toLocaleString()}<br>
+      <b>Difference:</b> ₦${(paye - newPAYE).toLocaleString()}
+    `;
+  });
 }
 
-/* ================= TEXT EXTRACT ================= */
+/* ================= TEXT NORMALIZATION ================= */
 
-function extract(text, keywords) {
+function normalizeText(text) {
 
-  for (let key of keywords) {
+  return text
+    .toUpperCase()
+    .replace(/₦/g, "")
+    .replace(/NGN/g, "")
+    .replace(/,/g, "")
+    .replace(/\r/g, "")
+    .trim();
+}
 
-    let regex = new RegExp(key + "\\s*[:\\-]?\\s*([0-9]{2,12})");
+/* ================= LINE BASED OCR EXTRACTION ================= */
 
-    let match = text.match(regex);
+function extractLineAmount(lines, keywords) {
 
-    if (match) return Number(match[1]);
+  for (let line of lines) {
+
+    for (let key of keywords) {
+
+      if (line.includes(key)) {
+
+        let match = line.match(/([0-9]+(?:\.[0-9]{1,2})?)/);
+
+        if (match) {
+
+          return Number(match[1]);
+        }
+      }
+    }
   }
 
   return null;
@@ -171,7 +228,6 @@ function processExcel() {
     const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
 
     const sheet = wb.Sheets[wb.SheetNames[0]];
-
     const json = XLSX.utils.sheet_to_json(sheet);
 
     processedData = json.map(r => {
