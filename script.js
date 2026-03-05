@@ -1,171 +1,246 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Nigeria PAYE & PIT Tool</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+/* ================= GLOBAL ================= */
 
-<script src="https://unpkg.com/tesseract.js@4.1.1/dist/tesseract.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+let selectedFile = null;
+let processedData = [];
 
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+const previewContainer = document.getElementById("previewContainer");
+const loading = document.getElementById("loading");
+const result = document.getElementById("result");
 
-<style>
+/* ================= TAB SWITCH ================= */
 
-body{
-font-family:'Inter',sans-serif;
-background:linear-gradient(135deg,#eef2f7,#f9fafb);
-min-height:100vh;
-display:flex;
-align-items:center;
-justify-content:center;
-padding:20px;
+function openTab(id, el) {
+
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+
+  el.classList.add("active");
+  document.getElementById(id).classList.add("active");
 }
 
-.card{
-max-width:900px;
-width:100%;
-background:#fff;
-border-radius:18px;
-padding:26px;
-box-shadow:0 20px 40px rgba(0,0,0,.12);
+/* ================= TAX CONFIG ================= */
+
+const TAX_FREE = 800000;
+
+const TAX_BANDS = [
+  { limit: 2200000, rate: 0.15 },
+  { limit: 6800000, rate: 0.18 },
+  { limit: 4000000, rate: 0.21 },
+  { limit: 12000000, rate: 0.23 },
+  { limit: Infinity, rate: 0.25 }
+];
+
+/* ================= TAX ENGINE ================= */
+
+function computePAYE(monthlyGross, pension = 0, nhf = 0, nhis = 0, other = 0) {
+
+  if (!monthlyGross) return 0;
+
+  const annualIncome = monthlyGross * 12;
+
+  const annualDeductions = (pension + nhf + nhis + other) * 12;
+
+  let taxable = Math.max(annualIncome - annualDeductions - TAX_FREE, 0);
+
+  let tax = 0;
+
+  for (let band of TAX_BANDS) {
+
+    if (taxable <= 0) break;
+
+    let amount = Math.min(band.limit, taxable);
+
+    tax += amount * band.rate;
+
+    taxable -= amount;
+  }
+
+  return tax / 12;
 }
 
-.tabs{
-display:flex;
-gap:8px;
-margin-bottom:20px;
+/* ================= FILE INPUT ================= */
+
+galleryInput.onchange = e => {
+
+  selectedFile = e.target.files[0];
+  preview(selectedFile);
+};
+
+cameraInput.onchange = e => {
+
+  selectedFile = e.target.files[0];
+  preview(selectedFile);
+};
+
+/* ================= IMAGE PREVIEW ================= */
+
+function preview(file) {
+
+  const reader = new FileReader();
+
+  reader.onload = e => {
+
+    previewContainer.innerHTML =
+      `<img src="${e.target.result}" style="max-width:100%;border-radius:8px;">`;
+
+  };
+
+  reader.readAsDataURL(file);
 }
 
-.tab{
-flex:1;
-padding:10px;
-border-radius:10px;
-text-align:center;
-font-weight:600;
-cursor:pointer;
-background:#e5e7eb;
+/* ================= OCR PROCESS ================= */
+
+function processSelectedFile() {
+
+  if (!selectedFile) {
+
+    alert("Upload payslip first");
+    return;
+  }
+
+  loading.innerText = "Reading payslip...";
+
+  Tesseract.recognize(selectedFile, 'eng')
+
+    .then(({ data: { text } }) => {
+
+      loading.innerText = "";
+
+      const clean = text.toUpperCase().replace(/₦|,/g, "");
+
+      const gross = extract(clean, ["GROSS", "TOTAL PAY"]);
+      const pension = extract(clean, ["PENSION"]) || 0;
+      const paye = extract(clean, ["PAYE", "TAX"]) || 0;
+
+      const newPAYE = computePAYE(gross, pension);
+
+      result.innerHTML = `
+      <b>Gross:</b> ₦${gross}<br>
+      <b>Pension:</b> ₦${pension}<br>
+      <b>Old PAYE:</b> ₦${paye}<hr>
+      <b>New PAYE:</b> ₦${newPAYE.toLocaleString()}
+      `;
+    });
 }
 
-.tab.active{
-background:#2563eb;
-color:#fff;
+/* ================= TEXT EXTRACT ================= */
+
+function extract(text, keywords) {
+
+  for (let key of keywords) {
+
+    let regex = new RegExp(key + "\\s*[:\\-]?\\s*([0-9]{2,12})");
+
+    let match = text.match(regex);
+
+    if (match) return Number(match[1]);
+  }
+
+  return null;
 }
 
-.tab-content{display:none;}
-.tab-content.active{display:block;}
+/* ================= PIT CALCULATOR ================= */
 
-input,button{
-width:100%;
-padding:12px;
-margin-top:8px;
-border-radius:10px;
+function calculatePIT() {
+
+  const gross = Number(pitGross.value);
+  const exp = Number(pitExpenses.value);
+
+  const newPAYE = computePAYE(gross, 0, 0, 0, exp);
+
+  pitResult.innerHTML =
+    `<b>Monthly PIT:</b> ₦${newPAYE.toLocaleString()}`;
 }
 
-button{
-border:none;
-background:#2563eb;
-color:#fff;
-cursor:pointer;
+/* ================= EXCEL PROCESS ================= */
+
+function processExcel() {
+
+  const file = excelFile.files[0];
+
+  if (!file) {
+
+    alert("Upload Excel file");
+    return;
+  }
+
+  const reader = new FileReader();
+
+  reader.onload = e => {
+
+    const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+
+    const json = XLSX.utils.sheet_to_json(sheet);
+
+    processedData = json.map(r => {
+
+      const gross = Number(r["Gross Salary"]) || 0;
+      const pension = Number(r["Pension"]) || 0;
+      const nhf = Number(r["NHF"]) || 0;
+      const nhis = Number(r["NHIS"]) || 0;
+      const other = Number(r["Other Deductions"]) || 0;
+      const oldPAYE = Number(r["Old PAYE"]) || 0;
+
+      const newPAYE = computePAYE(gross, pension, nhf, nhis, other);
+
+      return {
+        ...r,
+        "New PAYE": Math.round(newPAYE),
+        "Difference": Math.round(oldPAYE - newPAYE)
+      };
+    });
+
+    previewExcel(processedData);
+
+    downloadBtn.style.display = "block";
+  };
+
+  reader.readAsArrayBuffer(file);
 }
 
-button.camera-btn{
-background:#0f766e;
+/* ================= EXCEL PREVIEW ================= */
+
+function previewExcel(data) {
+
+  if (!data.length) return;
+
+  let html = "<table><tr>";
+
+  Object.keys(data[0]).forEach(k => {
+
+    html += `<th>${k}</th>`;
+  });
+
+  html += "</tr>";
+
+  data.forEach(row => {
+
+    html += "<tr>";
+
+    Object.values(row).forEach(v => {
+
+      html += `<td>${v}</td>`;
+    });
+
+    html += "</tr>";
+  });
+
+  html += "</table>";
+
+  excelPreview.innerHTML = html;
 }
 
-.result{
-margin-top:18px;
-background:#f1f5f9;
-padding:16px;
-border-radius:12px;
+/* ================= DOWNLOAD EXCEL ================= */
+
+function downloadExcel() {
+
+  const ws = XLSX.utils.json_to_sheet(processedData);
+
+  const wb = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(wb, ws, "Processed");
+
+  XLSX.writeFile(wb, "Processed_PAYE.xlsx");
 }
-
-table{
-width:100%;
-border-collapse:collapse;
-margin-top:10px;
-}
-
-th,td{
-padding:6px;
-border:1px solid #e2e8f0;
-}
-
-</style>
-</head>
-
-<body>
-
-<div class="card">
-
-<h2>🇳🇬 PAYE & PIT Calculator</h2>
-
-<div class="tabs">
-<div class="tab active" onclick="openTab('compare',this)">PAYE Comparison</div>
-<div class="tab" onclick="openTab('pit',this)">New PIT</div>
-<div class="tab" onclick="openTab('bulk',this)">Excel Bulk Payroll</div>
-</div>
-
-<!-- OCR -->
-<div id="compare" class="tab-content active">
-
-<h3>Payslip OCR</h3>
-
-<input type="file" id="galleryInput" accept="image/*">
-
-<button class="camera-btn" onclick="cameraInput.click()">
-📷 Open Camera
-</button>
-
-<input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none">
-
-<div id="previewContainer"></div>
-
-<button onclick="processSelectedFile()">
-Process Payslip
-</button>
-
-<p id="loading"></p>
-
-<div id="result" class="result"></div>
-
-</div>
-
-
-<!-- PIT -->
-<div id="pit" class="tab-content">
-
-<label>Monthly Gross</label>
-<input type="number" id="pitGross">
-
-<label>Allowable Expenses</label>
-<input type="number" id="pitExpenses">
-
-<button onclick="calculatePIT()">Calculate PIT</button>
-
-<div id="pitResult" class="result"></div>
-
-</div>
-
-
-<!-- Excel -->
-<div id="bulk" class="tab-content">
-
-<input type="file" id="excelFile" accept=".xlsx">
-
-<button onclick="processExcel()">Process Payroll</button>
-
-<div id="excelPreview"></div>
-
-<button id="downloadBtn" onclick="downloadExcel()" style="display:none">
-Download Processed Excel
-</button>
-
-</div>
-
-</div>
-
-<script src="script.js"></script>
-
-</body>
-</html>
