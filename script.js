@@ -87,59 +87,9 @@ function preview(file) {
   reader.readAsDataURL(file);
 }
 
-/* ================= IMAGE PREPROCESSING ================= */
-
-function preprocessImage(file) {
-
-  return new Promise(resolve => {
-
-    const img = new Image();
-    const reader = new FileReader();
-
-    reader.onload = e => {
-
-      img.src = e.target.result;
-
-      img.onload = () => {
-
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-
-        canvas.width = img.width;
-        canvas.height = img.height;
-
-        ctx.drawImage(img, 0, 0);
-
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-
-        for (let i = 0; i < data.length; i += 4) {
-
-          let gray =
-            data[i] * 0.3 +
-            data[i + 1] * 0.59 +
-            data[i + 2] * 0.11;
-
-          gray = gray > 140 ? 255 : 0;
-
-          data[i] = gray;
-          data[i + 1] = gray;
-          data[i + 2] = gray;
-        }
-
-        ctx.putImageData(imageData, 0, 0);
-
-        resolve(canvas);
-      };
-    };
-
-    reader.readAsDataURL(file);
-  });
-}
-
 /* ================= OCR PROCESS ================= */
 
-async function processSelectedFile() {
+function processSelectedFile() {
 
   if (!selectedFile) {
 
@@ -147,78 +97,70 @@ async function processSelectedFile() {
     return;
   }
 
-  loading.innerText = "Enhancing image...";
+  loading.innerText = "Reading payslip...";
 
-  const processedImage = await preprocessImage(selectedFile);
+  Tesseract.recognize(selectedFile, 'eng', {
+    logger: m => console.log(m)
+  })
 
-  loading.innerText = "Running AI OCR...";
+  .then(({ data: { text } }) => {
 
-  const { data: { text } } =
-    await Tesseract.recognize(processedImage, "eng", {
-      logger: m => console.log(m)
-    });
+    loading.innerText = "";
 
-  loading.innerText = "";
+    console.log("RAW OCR TEXT:\n", text);
 
-  console.log("RAW OCR:", text);
+    const clean = normalizeText(text);
 
-  const clean = normalizeText(text);
+    const lines = clean.split("\n");
 
-  const lines = clean.split("\n");
+    const gross = extractLineAmount(lines, [
+      "GROSS PAY",
+      "GROSS SALARY"
+    ]);
 
-  const gross = smartFind(lines, [
-    "GROSS PAY",
-    "GROSS SALARY",
-    "TOTAL PAY",
-    "TOTAL EARNINGS",
-    "GROSS"
-  ]);
+    const pension = extractLineAmount(lines, [
+      "PENSION",
+      "PFA"
+    ]) || 0;
 
-  const pension = smartFind(lines, [
-    "PENSION",
-    "RETIREMENT",
-    "PFA"
-  ]) || 0;
+    const nhf = extractLineAmount(lines, [
+      "NHF",
+      "HOUSING FUND"
+    ]) || 0;
 
-  const nhf = smartFind(lines, [
-    "NHF",
-    "HOUSING FUND",
-    "NATIONAL HOUSING"
-  ]) || 0;
+    const nhis = extractLineAmount(lines, [
+      "NHIS",
+      "HEALTH INSURANCE"
+    ]) || 0;
 
-  const nhis = smartFind(lines, [
-    "NHIS",
-    "HEALTH INSURANCE"
-  ]) || 0;
+    const paye = extractLineAmount(lines, [
+      "PAYE TAX",
+      "PAYE",
+      "PAY AS YOU EARN"
+    ]) || 0;
 
-  const paye = smartFind(lines, [
-    "PAYE",
-    "PAY AS YOU EARN",
-    "PAYE TAX",
-    "TAX"
-  ]) || 0;
+    if (!gross) {
 
-  if (!gross) {
+      result.innerHTML = "⚠ Gross Pay not detected.";
+      return;
+    }
 
-    result.innerHTML = "⚠ Gross Pay not detected.";
-    return;
-  }
+    const newPAYE = computePAYE(gross, pension, nhf, nhis);
 
-  const newPAYE = computePAYE(gross, pension, nhf, nhis);
-
-  result.innerHTML = `
-  <b>Gross:</b> ₦${gross.toLocaleString()}<br>
-  <b>Pension:</b> ₦${pension.toLocaleString()}<br>
-  <b>NHF:</b> ₦${nhf.toLocaleString()}<br>
-  <b>NHIS:</b> ₦${nhis.toLocaleString()}<br>
-  <b>Old PAYE:</b> ₦${paye.toLocaleString()}
-  <hr>
-  <b>Recomputed PAYE:</b> ₦${newPAYE.toLocaleString()}<br>
-  <b>Difference:</b> ₦${(paye - newPAYE).toLocaleString()}
-  `;
+    result.innerHTML = `
+      <b>Gross:</b> ₦${gross.toLocaleString()}<br>
+      <b>Pension:</b> ₦${pension.toLocaleString()}<br>
+      <b>NHF:</b> ₦${nhf.toLocaleString()}<br>
+      <b>NHIS:</b> ₦${nhis.toLocaleString()}<br>
+      <b>Old PAYE:</b> ₦${paye.toLocaleString()}
+      <hr>
+      <b>Recomputed PAYE:</b> ₦${newPAYE.toLocaleString()}<br>
+      <b>Difference:</b> ₦${(paye - newPAYE).toLocaleString()}
+    `;
+  });
 }
 
-/* ================= NORMALIZE TEXT ================= */
+/* ================= TEXT NORMALIZATION ================= */
 
 function normalizeText(text) {
 
@@ -227,15 +169,13 @@ function normalizeText(text) {
     .replace(/₦/g, "")
     .replace(/NGN/g, "")
     .replace(/,/g, "")
-    .replace(/[O]/g, "0")
-    .replace(/[I]/g, "1")
     .replace(/\r/g, "")
     .trim();
 }
 
-/* ================= FINTECH PARSER ================= */
+/* ================= LINE BASED OCR EXTRACTION ================= */
 
-function smartFind(lines, keywords) {
+function extractLineAmount(lines, keywords) {
 
   for (let line of lines) {
 
@@ -243,9 +183,12 @@ function smartFind(lines, keywords) {
 
       if (line.includes(key)) {
 
-        const num = line.match(/[0-9]+(\.[0-9]{1,2})?/);
+        let match = line.match(/([0-9]+(?:\.[0-9]{1,2})?)/);
 
-        if (num) return Number(num[0]);
+        if (match) {
+
+          return Number(match[1]);
+        }
       }
     }
   }
@@ -282,7 +225,7 @@ function processExcel() {
 
   reader.onload = e => {
 
-    const wb = XLSX.read(new Uint8Array(e.target.result), { type: "array" });
+    const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
 
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const json = XLSX.utils.sheet_to_json(sheet);
@@ -322,6 +265,7 @@ function previewExcel(data) {
   let html = "<table><tr>";
 
   Object.keys(data[0]).forEach(k => {
+
     html += `<th>${k}</th>`;
   });
 
@@ -332,6 +276,7 @@ function previewExcel(data) {
     html += "<tr>";
 
     Object.values(row).forEach(v => {
+
       html += `<td>${v}</td>`;
     });
 
