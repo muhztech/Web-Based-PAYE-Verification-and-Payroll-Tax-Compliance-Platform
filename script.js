@@ -106,32 +106,69 @@ function processSelectedFile() {
 
       loading.innerText = "";
 
-      const clean = text.toUpperCase().replace(/₦|,/g, "");
+      console.log("OCR TEXT:", text);
 
-      const gross = extract(clean, ["GROSS", "TOTAL PAY"]);
-      const pension = extract(clean, ["PENSION"]) || 0;
-      const paye = extract(clean, ["PAYE", "TAX"]) || 0;
+      const clean = normalizeText(text);
 
-      const newPAYE = computePAYE(gross, pension);
+      const gross =
+        extractAmount(clean, ["GROSS PAY", "GROSS SALARY", "TOTAL PAY", "TOTAL EARNINGS"]);
+
+      const pension =
+        extractAmount(clean, ["PENSION", "PFA"]) || 0;
+
+      const nhf =
+        extractAmount(clean, ["NHF", "NATIONAL HOUSING"]) || 0;
+
+      const nhis =
+        extractAmount(clean, ["NHIS", "HEALTH INSURANCE"]) || 0;
+
+      const paye =
+        extractAmount(clean, ["PAYE", "PAYE TAX", "PAY AS YOU EARN"]) || 0;
+
+      if (!gross) {
+
+        result.innerHTML = "⚠ Gross Pay not detected from payslip.";
+        return;
+      }
+
+      const newPAYE = computePAYE(gross, pension, nhf, nhis);
 
       result.innerHTML = `
-      <b>Gross:</b> ₦${gross}<br>
-      <b>Pension:</b> ₦${pension}<br>
-      <b>Old PAYE:</b> ₦${paye}<hr>
-      <b>New PAYE:</b> ₦${newPAYE.toLocaleString()}
+      <b>Gross:</b> ₦${gross.toLocaleString()}<br>
+      <b>Pension:</b> ₦${pension.toLocaleString()}<br>
+      <b>NHF:</b> ₦${nhf.toLocaleString()}<br>
+      <b>NHIS:</b> ₦${nhis.toLocaleString()}<br>
+      <b>Old PAYE:</b> ₦${paye.toLocaleString()}
+      <hr>
+      <b>Recomputed PAYE:</b> ₦${newPAYE.toLocaleString()}<br>
+      <b>Difference:</b> ₦${(paye - newPAYE).toLocaleString()}
       `;
     });
 }
 
-/* ================= TEXT EXTRACT ================= */
+/* ================= TEXT NORMALIZATION ================= */
 
-function extract(text, keywords) {
+function normalizeText(text) {
+
+  return text
+    .toUpperCase()
+    .replace(/₦/g, "")
+    .replace(/,/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/* ================= AMOUNT EXTRACTOR ================= */
+
+function extractAmount(text, keywords) {
 
   for (let key of keywords) {
 
-    let regex = new RegExp(key + "\\s*[:\\-]?\\s*([0-9]{2,12})");
+    const regex = new RegExp(
+      key + "\\s*[:\\-]?\\s*([0-9]+(?:\\.[0-9]{1,2})?)"
+    );
 
-    let match = text.match(regex);
+    const match = text.match(regex);
 
     if (match) return Number(match[1]);
   }
