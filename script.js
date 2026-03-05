@@ -60,13 +60,11 @@ function computePAYE(monthlyGross, pension = 0, nhf = 0, nhis = 0, other = 0) {
 /* ================= FILE INPUT ================= */
 
 galleryInput.onchange = e => {
-
   selectedFile = e.target.files[0];
   preview(selectedFile);
 };
 
 cameraInput.onchange = e => {
-
   selectedFile = e.target.files[0];
   preview(selectedFile);
 };
@@ -142,7 +140,6 @@ function preprocessImage(file) {
 async function processSelectedFile() {
 
   if (!selectedFile) {
-
     alert("Upload payslip first");
     return;
   }
@@ -151,12 +148,10 @@ async function processSelectedFile() {
 
   const processedImage = await preprocessImage(selectedFile);
 
-  loading.innerText = "Running AI OCR...";
+  loading.innerText = "Running OCR...";
 
   const { data: { text } } =
-    await Tesseract.recognize(processedImage, "eng", {
-      logger: m => console.log(m)
-    });
+    await Tesseract.recognize(processedImage, "eng");
 
   loading.innerText = "";
 
@@ -171,30 +166,20 @@ async function processSelectedFile() {
     "GROSS SALARY",
     "TOTAL PAY",
     "TOTAL EARNINGS",
+    "CONSOLIDATED SALARY",
     "GROSS"
   ]);
 
-  const pension = smartFind(lines, [
-    "PENSION",
-    "RETIREMENT",
-    "PFA"
-  ]) || 0;
+  const pension = smartFind(lines, ["PENSION", "PFA"]) || 0;
 
-  const nhf = smartFind(lines, [
-    "NHF",
-    "HOUSING FUND",
-    "NATIONAL HOUSING"
-  ]) || 0;
+  const nhf = smartFind(lines, ["NHF", "HOUSING"]) || 0;
 
-  const nhis = smartFind(lines, [
-    "NHIS",
-    "HEALTH INSURANCE"
-  ]) || 0;
+  const nhis = smartFind(lines, ["NHIS", "HEALTH"]) || 0;
 
   const paye = smartFind(lines, [
+    "PAYE TAX",
     "PAYE",
     "PAY AS YOU EARN",
-    "PAYE TAX",
     "TAX"
   ]) || 0;
 
@@ -233,19 +218,34 @@ function normalizeText(text) {
     .trim();
 }
 
-/* ================= FINTECH PARSER ================= */
+/* ================= FINTECH LEVEL PARSER ================= */
 
 function smartFind(lines, keywords) {
 
-  for (let line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+
+    let line = lines[i];
 
     for (let key of keywords) {
 
       if (line.includes(key)) {
 
-        const num = line.match(/[0-9]+(\.[0-9]{1,2})?/);
+        let nums = line.match(/[0-9]+(\.[0-9]{1,2})?/g);
 
-        if (num) return Number(num[0]);
+        if (nums) {
+
+          return Math.max(...nums.map(Number));
+        }
+
+        if (lines[i + 1]) {
+
+          let nextNums = lines[i + 1].match(/[0-9]+(\.[0-9]{1,2})?/g);
+
+          if (nextNums) {
+
+            return Math.max(...nextNums.map(Number));
+          }
+        }
       }
     }
   }
@@ -273,7 +273,6 @@ function processExcel() {
   const file = excelFile.files[0];
 
   if (!file) {
-
     alert("Upload Excel file");
     return;
   }
