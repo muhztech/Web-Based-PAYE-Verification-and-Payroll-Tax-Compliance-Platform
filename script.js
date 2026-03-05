@@ -76,8 +76,10 @@ function preview(file) {
   const reader = new FileReader();
 
   reader.onload = e => {
+
     previewContainer.innerHTML =
       `<img src="${e.target.result}" style="max-width:100%;border-radius:8px;">`;
+
   };
 
   reader.readAsDataURL(file);
@@ -153,11 +155,11 @@ async function processSelectedFile() {
 
   loading.innerText = "";
 
-  console.log("OCR RAW TEXT:", text);
+  console.log("RAW OCR:", text);
 
   const clean = normalizeText(text);
 
-  const lines = clean.split("\n").map(l => l.trim()).filter(Boolean);
+  const lines = clean.split("\n");
 
   const gross = smartFind(lines, [
     "GROSS PAY",
@@ -168,23 +170,11 @@ async function processSelectedFile() {
     "GROSS"
   ]);
 
-  const pension = smartFind(lines, [
-    "PENSION",
-    "PFA",
-    "RETIREMENT"
-  ]) || 0;
+  const pension = smartFind(lines, ["PENSION", "PFA"]) || 0;
 
-  const nhf = smartFind(lines, [
-    "NHF",
-    "HOUSING",
-    "HOUSING FUND"
-  ]) || 0;
+  const nhf = smartFind(lines, ["NHF", "HOUSING"]) || 0;
 
-  const nhis = smartFind(lines, [
-    "NHIS",
-    "HEALTH",
-    "HEALTH INSURANCE"
-  ]) || 0;
+  const nhis = smartFind(lines, ["NHIS", "HEALTH"]) || 0;
 
   const paye = smartFind(lines, [
     "PAYE TAX",
@@ -195,10 +185,7 @@ async function processSelectedFile() {
 
   if (!gross) {
 
-    result.innerHTML = `
-    ⚠ Gross Pay not detected.<br><br>
-    Please upload a clearer payslip image.
-    `;
+    result.innerHTML = "⚠ Gross Pay not detected.";
     return;
   }
 
@@ -231,7 +218,7 @@ function normalizeText(text) {
     .trim();
 }
 
-/* ================= FINTECH PARSER ================= */
+/* ================= FINTECH LEVEL PARSER ================= */
 
 function smartFind(lines, keywords) {
 
@@ -243,20 +230,20 @@ function smartFind(lines, keywords) {
 
       if (line.includes(key)) {
 
-        // numbers on same line
         let nums = line.match(/[0-9]+(\.[0-9]{1,2})?/g);
-        if (nums) return Math.max(...nums.map(Number));
 
-        // check next 2 lines
-        for (let j = 1; j <= 2; j++) {
+        if (nums) {
 
-          if (lines[i + j]) {
+          return Math.max(...nums.map(Number));
+        }
 
-            let nextNums = lines[i + j].match(/[0-9]+(\.[0-9]{1,2})?/g);
+        if (lines[i + 1]) {
 
-            if (nextNums) {
-              return Math.max(...nextNums.map(Number));
-            }
+          let nextNums = lines[i + 1].match(/[0-9]+(\.[0-9]{1,2})?/g);
+
+          if (nextNums) {
+
+            return Math.max(...nextNums.map(Number));
           }
         }
       }
