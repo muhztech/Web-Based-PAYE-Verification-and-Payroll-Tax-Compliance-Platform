@@ -106,69 +106,32 @@ function processSelectedFile() {
 
       loading.innerText = "";
 
-      console.log("OCR TEXT:", text);
+      const clean = text.toUpperCase().replace(/₦|,/g, "");
 
-      const clean = normalizeText(text);
+      const gross = extract(clean, ["GROSS", "TOTAL PAY"]);
+      const pension = extract(clean, ["PENSION"]) || 0;
+      const paye = extract(clean, ["PAYE", "TAX"]) || 0;
 
-      const gross =
-        extractAmount(clean, ["GROSS PAY", "GROSS SALARY", "TOTAL PAY", "TOTAL EARNINGS"]);
-
-      const pension =
-        extractAmount(clean, ["PENSION", "PFA"]) || 0;
-
-      const nhf =
-        extractAmount(clean, ["NHF", "NATIONAL HOUSING"]) || 0;
-
-      const nhis =
-        extractAmount(clean, ["NHIS", "HEALTH INSURANCE"]) || 0;
-
-      const paye =
-        extractAmount(clean, ["PAYE", "PAYE TAX", "PAY AS YOU EARN"]) || 0;
-
-      if (!gross) {
-
-        result.innerHTML = "⚠ Gross Pay not detected from payslip.";
-        return;
-      }
-
-      const newPAYE = computePAYE(gross, pension, nhf, nhis);
+      const newPAYE = computePAYE(gross, pension);
 
       result.innerHTML = `
-      <b>Gross:</b> ₦${gross.toLocaleString()}<br>
-      <b>Pension:</b> ₦${pension.toLocaleString()}<br>
-      <b>NHF:</b> ₦${nhf.toLocaleString()}<br>
-      <b>NHIS:</b> ₦${nhis.toLocaleString()}<br>
-      <b>Old PAYE:</b> ₦${paye.toLocaleString()}
-      <hr>
-      <b>Recomputed PAYE:</b> ₦${newPAYE.toLocaleString()}<br>
-      <b>Difference:</b> ₦${(paye - newPAYE).toLocaleString()}
+      <b>Gross:</b> ₦${gross}<br>
+      <b>Pension:</b> ₦${pension}<br>
+      <b>Old PAYE:</b> ₦${paye}<hr>
+      <b>New PAYE:</b> ₦${newPAYE.toLocaleString()}
       `;
     });
 }
 
-/* ================= TEXT NORMALIZATION ================= */
+/* ================= TEXT EXTRACT ================= */
 
-function normalizeText(text) {
-
-  return text
-    .toUpperCase()
-    .replace(/₦/g, "")
-    .replace(/,/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/* ================= AMOUNT EXTRACTOR ================= */
-
-function extractAmount(text, keywords) {
+function extract(text, keywords) {
 
   for (let key of keywords) {
 
-    const regex = new RegExp(
-      key + "\\s*[:\\-]?\\s*([0-9]+(?:\\.[0-9]{1,2})?)"
-    );
+    let regex = new RegExp(key + "\\s*[:\\-]?\\s*([0-9]{2,12})");
 
-    const match = text.match(regex);
+    let match = text.match(regex);
 
     if (match) return Number(match[1]);
   }
