@@ -37,7 +37,6 @@ function computePAYE(monthlyGross, pension = 0, nhf = 0, nhis = 0, other = 0) {
   if (!monthlyGross) return 0;
 
   const annualIncome = monthlyGross * 12;
-
   const annualDeductions = (pension + nhf + nhis + other) * 12;
 
   let taxable = Math.max(annualIncome - annualDeductions - TAX_FREE, 0);
@@ -100,64 +99,55 @@ function processSelectedFile() {
 
   loading.innerText = "Reading payslip...";
 
-  Tesseract.recognize(selectedFile, 'eng')
+  Tesseract.recognize(selectedFile, 'eng', {
+    logger: m => console.log(m)
+  })
 
-    .then(({ data: { text } }) => {
+  .then(({ data: { text } }) => {
 
-      loading.innerText = "";
+    loading.innerText = "";
 
-      console.log("OCR TEXT:", text);
+    console.log("RAW OCR TEXT:\n", text);
 
-      const clean = normalizeText(text);
+    const clean = normalizeText(text);
 
-      const gross =
-        extractAmount(clean, [
-          "GROSS PAY",
-          "GROSS SALARY",
-          "TOTAL PAY",
-          "TOTAL EARNINGS",
-          "GROSS"
-        ]);
+    const lines = clean.split("\n");
 
-      const pension =
-        extractAmount(clean, [
-          "PENSION",
-          "PFA",
-          "RETIREMENT"
-        ]) || 0;
+    const gross = extractLineAmount(lines, [
+      "GROSS PAY",
+      "GROSS SALARY"
+    ]);
 
-      const nhf =
-        extractAmount(clean, [
-          "NHF",
-          "NATIONAL HOUSING",
-          "HOUSING FUND"
-        ]) || 0;
+    const pension = extractLineAmount(lines, [
+      "PENSION",
+      "PFA"
+    ]) || 0;
 
-      const nhis =
-        extractAmount(clean, [
-          "NHIS",
-          "HEALTH INSURANCE"
-        ]) || 0;
+    const nhf = extractLineAmount(lines, [
+      "NHF",
+      "HOUSING FUND"
+    ]) || 0;
 
-      const paye =
-        extractAmount(clean, [
-          "PAYE",
-          "PAYE TAX",
-          "PAY AS YOU EARN",
-          "PAY-AS-YOU-EARN",
-          "TAX",
-          "STATUTORY TAX"
-        ]) || 0;
+    const nhis = extractLineAmount(lines, [
+      "NHIS",
+      "HEALTH INSURANCE"
+    ]) || 0;
 
-      if (!gross) {
+    const paye = extractLineAmount(lines, [
+      "PAYE TAX",
+      "PAYE",
+      "PAY AS YOU EARN"
+    ]) || 0;
 
-        result.innerHTML = "⚠ Gross Pay not detected from payslip.";
-        return;
-      }
+    if (!gross) {
 
-      const newPAYE = computePAYE(gross, pension, nhf, nhis);
+      result.innerHTML = "⚠ Gross Pay not detected.";
+      return;
+    }
 
-      result.innerHTML = `
+    const newPAYE = computePAYE(gross, pension, nhf, nhis);
+
+    result.innerHTML = `
       <b>Gross:</b> ₦${gross.toLocaleString()}<br>
       <b>Pension:</b> ₦${pension.toLocaleString()}<br>
       <b>NHF:</b> ₦${nhf.toLocaleString()}<br>
@@ -166,8 +156,8 @@ function processSelectedFile() {
       <hr>
       <b>Recomputed PAYE:</b> ₦${newPAYE.toLocaleString()}<br>
       <b>Difference:</b> ₦${(paye - newPAYE).toLocaleString()}
-      `;
-    });
+    `;
+  });
 }
 
 /* ================= TEXT NORMALIZATION ================= */
@@ -179,33 +169,28 @@ function normalizeText(text) {
     .replace(/₦/g, "")
     .replace(/NGN/g, "")
     .replace(/,/g, "")
-    .replace(/\s+/g, " ")
+    .replace(/\r/g, "")
     .trim();
 }
 
-/* ================= SMART AMOUNT EXTRACTOR ================= */
+/* ================= LINE BASED OCR EXTRACTION ================= */
 
-function extractAmount(text, keywords) {
+function extractLineAmount(lines, keywords) {
 
-  for (let key of keywords) {
+  for (let line of lines) {
 
-    // Pattern 1: LABEL 12345
-    let regex1 = new RegExp(key + "\\s*[:\\-]?\\s*([0-9]+(?:\\.[0-9]{1,2})?)");
-    let match1 = text.match(regex1);
+    for (let key of keywords) {
 
-    if (match1) return Number(match1[1]);
+      if (line.includes(key)) {
 
-    // Pattern 2: 12345 LABEL
-    let regex2 = new RegExp("([0-9]+(?:\\.[0-9]{1,2})?)\\s*" + key);
-    let match2 = text.match(regex2);
+        let match = line.match(/([0-9]+(?:\.[0-9]{1,2})?)/);
 
-    if (match2) return Number(match2[1]);
+        if (match) {
 
-    // Pattern 3: LABEL ... 12345
-    let regex3 = new RegExp(key + "[^0-9]{0,15}([0-9]+(?:\\.[0-9]{1,2})?)");
-    let match3 = text.match(regex3);
-
-    if (match3) return Number(match3[1]);
+          return Number(match[1]);
+        }
+      }
+    }
   }
 
   return null;
@@ -243,7 +228,6 @@ function processExcel() {
     const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
 
     const sheet = wb.Sheets[wb.SheetNames[0]];
-
     const json = XLSX.utils.sheet_to_json(sheet);
 
     processedData = json.map(r => {
