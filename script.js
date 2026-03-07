@@ -2,6 +2,11 @@
 
 let selectedFile = null;
 let processedData = [];
+let lastGross = 0;
+let lastPension = 0;
+let lastNHF = 0;
+let lastNHIS = 0;
+let lastPAYE = 0;
 
 const previewContainer = document.getElementById("previewContainer");
 const loading = document.getElementById("loading");
@@ -127,8 +132,6 @@ async function processSelectedFile() {
 
     loading.innerText = "";
 
-    console.log("OCR TEXT:", text);
-
     const clean = normalizeText(text);
 
     const gross =
@@ -149,19 +152,13 @@ async function processSelectedFile() {
     const nhf =
       extractAmount(clean, [
         "NHF",
-        "N H F",
-        "N.H.F",
-        "NHF CONTRIBUTION",
-        "NATIONAL HOUSING FUND",
-        "HOUSING FUND",
-        "HOUSING"
+        "HOUSING FUND"
       ]) || 0;
 
     const nhis =
       extractAmount(clean, [
         "NHIS",
-        "HEALTH INSURANCE",
-        "NATIONAL HEALTH"
+        "HEALTH INSURANCE"
       ]) || 0;
 
     const paye =
@@ -178,6 +175,12 @@ async function processSelectedFile() {
       return;
     }
 
+    lastGross = gross;
+    lastPension = pension;
+    lastNHF = nhf;
+    lastNHIS = nhis;
+    lastPAYE = paye;
+
     const newPAYE = computePAYE(gross, pension, nhf, nhis);
 
     result.innerHTML = `
@@ -193,7 +196,85 @@ async function processSelectedFile() {
   });
 }
 
-/* ================= OPTIMIZED PDF TO IMAGE ================= */
+/* ================= RENT RELIEF ================= */
+
+function applyRentRelief() {
+
+  const rentChecked = document.getElementById("rentCheck").checked;
+  const employerHouse = document.getElementById("employerHouse").checked;
+  const rentAmount = Number(document.getElementById("rentAmount").value);
+
+  if (!lastGross) {
+    alert("Process a payslip first.");
+    return;
+  }
+
+  if (employerHouse) {
+
+    result.innerHTML += `<hr><span class="warning">
+    ⚠ Rent relief not allowed because employer provides accommodation.
+    </span>`;
+
+    return;
+  }
+
+  if (!rentChecked) {
+
+    result.innerHTML += `<hr>
+    <span class="warning">
+    Employee did not declare rent. No relief applied.
+    </span>`;
+
+    return;
+  }
+
+  const annualIncome = lastGross * 12;
+
+  const maxRelief = annualIncome * 0.20;
+
+  const relief = Math.min(rentAmount, maxRelief);
+
+  const reliefMonthly = relief / 12;
+
+  const newPAYE = computePAYE(
+    lastGross,
+    lastPension,
+    lastNHF,
+    lastNHIS,
+    reliefMonthly
+  );
+
+  const diff = lastPAYE - newPAYE;
+
+  let message = "";
+
+  if (diff > 0) {
+
+    message = `
+    <span class="warning">
+    ⚠ PAYE Over-Deduction Detected<br>
+    Refund Due: ₦${diff.toLocaleString()}
+    </span>`;
+  }
+
+  result.innerHTML += `
+
+  <hr>
+
+  <b>Rent Relief Applied</b><br>
+
+  Annual Rent Declared: ₦${rentAmount.toLocaleString()}<br>
+  Allowed Relief: ₦${relief.toLocaleString()}<br>
+
+  <hr>
+
+  <b>Correct PAYE After Relief:</b> ₦${newPAYE.toLocaleString()}<br>
+
+  ${message}
+  `;
+}
+
+/* ================= OPTIMIZED PDF OCR ================= */
 
 async function convertPDFtoImage(file) {
 
@@ -203,10 +284,10 @@ async function convertPDFtoImage(file) {
 
   const page = await pdf.getPage(1);
 
-  // Reduced scale for faster OCR
   const viewport = page.getViewport({ scale: 1.5 });
 
   const canvas = document.createElement("canvas");
+
   const context = canvas.getContext("2d");
 
   canvas.width = viewport.width;
@@ -217,7 +298,6 @@ async function convertPDFtoImage(file) {
     viewport: viewport
   }).promise;
 
-  // Compress canvas before OCR
   return new Promise(resolve => {
 
     canvas.toBlob(blob => {
