@@ -7,8 +7,7 @@
 
 <script src="https://unpkg.com/tesseract.js@4.1.1/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
@@ -93,6 +92,36 @@ padding:6px;
 border:1px solid #e2e8f0;
 }
 
+/* NEW SECTION */
+
+.relief-box{
+background:#eef6ff;
+padding:14px;
+border-radius:12px;
+margin-top:15px;
+}
+
+.checkbox{
+display:flex;
+gap:8px;
+align-items:center;
+margin-top:10px;
+}
+
+.checkbox input{
+width:auto;
+}
+
+.warning{
+color:#b91c1c;
+font-weight:600;
+}
+
+.success{
+color:#047857;
+font-weight:600;
+}
+
 </style>
 </head>
 
@@ -113,7 +142,7 @@ border:1px solid #e2e8f0;
 
 <h3>Payslip OCR</h3>
 
-<input type="file" id="galleryInput" accept="image/*">
+<input type="file" id="galleryInput" accept="image/*,.pdf">
 
 <button class="camera-btn" onclick="cameraInput.click()">
 📷 Open Camera
@@ -128,6 +157,29 @@ Process Payslip
 </button>
 
 <p id="loading"></p>
+
+<!-- RENT RELIEF SECTION -->
+
+<div class="relief-box">
+
+<h3>🏠 Rent Relief Declaration</h3>
+
+<div class="checkbox">
+<input type="checkbox" id="rentCheck">
+<label>I confirm I pay rent and do not live in employer accommodation</label>
+</div>
+
+<label>Annual Rent Paid</label>
+<input type="number" id="rentAmount" placeholder="Enter annual rent">
+
+<div class="checkbox">
+<input type="checkbox" id="employerHouse">
+<label>Employer provides accommodation</label>
+</div>
+
+<button onclick="applyRentRelief()">Apply Rent Relief</button>
+
+</div>
 
 <div id="result" class="result"></div>
 
@@ -171,4 +223,3 @@ Download Processed Excel
 
 </body>
 </html>
-
