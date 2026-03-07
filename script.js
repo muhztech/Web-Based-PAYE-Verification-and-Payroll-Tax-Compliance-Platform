@@ -76,6 +76,14 @@ cameraInput.onchange = e => {
 
 function preview(file) {
 
+  if (file.type === "application/pdf") {
+
+    previewContainer.innerHTML =
+      `<p>📄 PDF uploaded: ${file.name}</p>`;
+
+    return;
+  }
+
   const reader = new FileReader();
 
   reader.onload = e => {
@@ -90,7 +98,7 @@ function preview(file) {
 
 /* ================= OCR PROCESS ================= */
 
-function processSelectedFile() {
+async function processSelectedFile() {
 
   if (!selectedFile) {
 
@@ -100,66 +108,79 @@ function processSelectedFile() {
 
   loading.innerText = "Reading payslip...";
 
-  Tesseract.recognize(selectedFile, 'eng')
+  let imageData;
 
-    .then(({ data: { text } }) => {
+  if (selectedFile.type === "application/pdf") {
 
-      loading.innerText = "";
+    imageData = await convertPDFtoImage(selectedFile);
 
-      console.log("OCR TEXT:", text);
+  } else {
 
-      const clean = normalizeText(text);
+    imageData = selectedFile;
+  }
 
-      const gross =
-        extractAmount(clean, [
-          "GROSS PAY",
-          "GROSS SALARY",
-          "TOTAL PAY",
-          "TOTAL EARNINGS"
-        ]);
+  Tesseract.recognize(imageData, 'eng', {
+    logger: m => console.log(m)
+  })
 
-      const pension =
-        extractAmount(clean, [
-          "PENSION",
-          "PFA",
-          "RETIREMENT"
-        ]) || 0;
+  .then(({ data: { text } }) => {
 
-      const nhf =
-        extractAmount(clean, [
-          "NHF",
-          "N H F",
-          "N.H.F",
-          "NHF CONTRIBUTION",
-          "NATIONAL HOUSING FUND",
-          "HOUSING FUND",
-          "HOUSING"
-        ]) || 0;
+    loading.innerText = "";
 
-      const nhis =
-        extractAmount(clean, [
-          "NHIS",
-          "HEALTH INSURANCE",
-          "NATIONAL HEALTH"
-        ]) || 0;
+    console.log("OCR TEXT:", text);
 
-      const paye =
-        extractAmount(clean, [
-          "PAYE",
-          "PAYE TAX",
-          "PAY AS YOU EARN",
-          "TAX"
-        ]) || 0;
+    const clean = normalizeText(text);
 
-      if (!gross) {
+    const gross =
+      extractAmount(clean, [
+        "GROSS PAY",
+        "GROSS SALARY",
+        "TOTAL PAY",
+        "TOTAL EARNINGS"
+      ]);
 
-        result.innerHTML = "⚠ Gross Pay not detected from payslip.";
-        return;
-      }
+    const pension =
+      extractAmount(clean, [
+        "PENSION",
+        "PFA",
+        "RETIREMENT"
+      ]) || 0;
 
-      const newPAYE = computePAYE(gross, pension, nhf, nhis);
+    const nhf =
+      extractAmount(clean, [
+        "NHF",
+        "N H F",
+        "N.H.F",
+        "NHF CONTRIBUTION",
+        "NATIONAL HOUSING FUND",
+        "HOUSING FUND",
+        "HOUSING"
+      ]) || 0;
 
-      result.innerHTML = `
+    const nhis =
+      extractAmount(clean, [
+        "NHIS",
+        "HEALTH INSURANCE",
+        "NATIONAL HEALTH"
+      ]) || 0;
+
+    const paye =
+      extractAmount(clean, [
+        "PAYE",
+        "PAYE TAX",
+        "PAY AS YOU EARN",
+        "TAX"
+      ]) || 0;
+
+    if (!gross) {
+
+      result.innerHTML = "⚠ Gross Pay not detected from payslip.";
+      return;
+    }
+
+    const newPAYE = computePAYE(gross, pension, nhf, nhis);
+
+    result.innerHTML = `
       <b>Gross:</b> ₦${gross.toLocaleString()}<br>
       <b>Pension:</b> ₦${pension.toLocaleString()}<br>
       <b>NHF:</b> ₦${nhf.toLocaleString()}<br>
@@ -169,7 +190,34 @@ function processSelectedFile() {
       <b>Recomputed PAYE:</b> ₦${newPAYE.toLocaleString()}<br>
       <b>Difference:</b> ₦${(paye - newPAYE).toLocaleString()}
       `;
-    });
+  });
+}
+
+/* ================= PDF TO IMAGE ================= */
+
+async function convertPDFtoImage(file) {
+
+  const pdfData = await file.arrayBuffer();
+
+  const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+
+  const page = await pdf.getPage(1);
+
+  const viewport = page.getViewport({ scale: 2 });
+
+  const canvas = document.createElement("canvas");
+
+  const context = canvas.getContext("2d");
+
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+
+  await page.render({
+    canvasContext: context,
+    viewport: viewport
+  }).promise;
+
+  return canvas;
 }
 
 /* ================= TEXT NORMALIZATION ================= */
