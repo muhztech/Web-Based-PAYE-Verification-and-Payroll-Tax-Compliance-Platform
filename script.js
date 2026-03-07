@@ -193,7 +193,7 @@ async function processSelectedFile() {
   });
 }
 
-/* ================= PDF TO IMAGE ================= */
+/* ================= OPTIMIZED PDF TO IMAGE ================= */
 
 async function convertPDFtoImage(file) {
 
@@ -203,10 +203,10 @@ async function convertPDFtoImage(file) {
 
   const page = await pdf.getPage(1);
 
-  const viewport = page.getViewport({ scale: 2 });
+  // Reduced scale for faster OCR
+  const viewport = page.getViewport({ scale: 1.5 });
 
   const canvas = document.createElement("canvas");
-
   const context = canvas.getContext("2d");
 
   canvas.width = viewport.width;
@@ -217,7 +217,20 @@ async function convertPDFtoImage(file) {
     viewport: viewport
   }).promise;
 
-  return canvas;
+  // Compress canvas before OCR
+  return new Promise(resolve => {
+
+    canvas.toBlob(blob => {
+
+      const img = new Image();
+
+      img.onload = () => resolve(img);
+
+      img.src = URL.createObjectURL(blob);
+
+    }, "image/jpeg", 0.7);
+
+  });
 }
 
 /* ================= TEXT NORMALIZATION ================= */
