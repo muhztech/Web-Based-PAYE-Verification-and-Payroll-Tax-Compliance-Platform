@@ -363,7 +363,7 @@ function calculatePIT() {
     `<b>Monthly PIT:</b> ₦${newPAYE.toLocaleString()}`;
 }
 
-/* ================= EXCEL PROCESS (UPGRADED) ================= */
+/* ================= EXCEL PROCESS (FIXED) ================= */
 
 function processExcel() {
 
@@ -395,17 +395,25 @@ function processExcel() {
 
       const rent = Number(r["Rent"]) || 0;
 
+      const rentingValue =
+        r["Renting"] ??
+        r["Renting (Yes/No)"] ??
+        "";
+
       const renting =
-        String(r["Renting (Yes/No)"] || "")
-        .toLowerCase()
-        .trim() === "yes";
+        String(rentingValue).toLowerCase().trim() === "yes" ||
+        String(rentingValue).toLowerCase().trim() === "true" ||
+        String(rentingValue).trim() === "1";
 
       const employerHouse =
         String(r["Employer Housing"] || "")
         .toLowerCase()
         .trim() === "yes";
 
-      const oldPAYE = Number(r["Old PAYE"]) || 0;
+      const oldPAYE =
+        Number(r["PAYE Deducted"]) ||
+        Number(r["Old PAYE"]) ||
+        0;
 
       let reliefMonthly = 0;
       let compliance = "OK";
@@ -420,9 +428,12 @@ function processExcel() {
 
         reliefMonthly = relief / 12;
 
-        if (oldPAYE > computePAYE(gross, pension, nhf, nhis, reliefMonthly)) {
+        const recomputed =
+          computePAYE(gross, pension, nhf, nhis, reliefMonthly);
 
-          compliance = "⚠ Over-deduction detected";
+        if (oldPAYE > recomputed) {
+
+          compliance = "⚠ PAYE Over-Deduction";
         }
       }
 
