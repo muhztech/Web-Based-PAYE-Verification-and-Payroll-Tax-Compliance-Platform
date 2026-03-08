@@ -16,26 +16,16 @@
 /* ================= COLOR SYSTEM ================= */
 
 :root{
-
 --primary:#1E40AF;
 --primary-hover:#3B82F6;
-
 --accent:#10B981;
-
 --warning:#F59E0B;
-
 --danger:#EF4444;
-
 --bg-main:#F8FAFC;
-
 --bg-card:#FFFFFF;
-
 --bg-soft:#F1F5F9;
-
 --text-main:#1F2937;
-
 --text-muted:#6B7280;
-
 }
 
 /* ================= GLOBAL ================= */
@@ -112,6 +102,14 @@ color:white;
 padding:30px;
 }
 
+.tab-content{
+display:none;
+}
+
+.tab-content.active{
+display:block;
+}
+
 .card{
 background:var(--bg-card);
 padding:24px;
@@ -126,11 +124,12 @@ button{
 background:var(--primary);
 border:none;
 color:white;
-padding:12px;
+padding:12px 16px;
 border-radius:10px;
 cursor:pointer;
-margin-top:10px;
+margin-top:12px;
 transition:0.2s;
+font-weight:600;
 }
 
 button:hover{
@@ -177,14 +176,23 @@ border-radius:10px;
 
 .relief{
 background:#eef6ff;
-padding:14px;
-border-radius:10px;
+padding:20px;
+border-radius:12px;
+margin-top:15px;
+}
+
+.relief h3{
+margin-top:0;
+}
+
+.form-group{
 margin-top:15px;
 }
 
 .checkbox{
 display:flex;
-gap:8px;
+align-items:center;
+gap:10px;
 margin-top:10px;
 }
 
@@ -234,17 +242,16 @@ background:#E2E8F0;
 }
 
 .template-note{
-margin-top:10px;
+margin-top:15px;
 color:var(--text-muted);
 font-size:13px;
+line-height:1.6;
 }
 
 </style>
 </head>
 
 <body>
-
-<!-- NAVBAR -->
 
 <div class="nav">
 <div class="logo">🇳🇬 PAYE Compliance Dashboard</div>
@@ -267,7 +274,7 @@ font-size:13px;
 
 </div>
 
-<!-- MAIN CONTENT -->
+<!-- MAIN -->
 
 <div class="main">
 
@@ -297,21 +304,25 @@ Process Payslip
 
 </div>
 
+<!-- RENT RELIEF -->
+
 <div class="card relief">
 
 <h3>🏠 Rent Relief Declaration</h3>
 
-<div class="checkbox">
+<div class="form-group checkbox">
 <input type="checkbox" id="rentCheck">
-<label>I confirm I pay rent</label>
+<label for="rentCheck">I confirm I pay rent</label>
 </div>
 
+<div class="form-group">
 <label>Annual Rent</label>
-<input type="number" id="rentAmount">
+<input type="number" id="rentAmount" placeholder="Enter annual rent amount">
+</div>
 
-<div class="checkbox">
+<div class="form-group checkbox">
 <input type="checkbox" id="employerHouse">
-<label>Employer provides accommodation</label>
+<label for="employerHouse">Employer provides accommodation</label>
 </div>
 
 <button onclick="applyRentRelief()">
@@ -326,7 +337,7 @@ Apply Rent Relief
 
 <!-- PIT CALCULATOR -->
 
-<div id="pit" class="tab-content" style="display:none">
+<div id="pit" class="tab-content">
 
 <div class="card">
 
@@ -348,7 +359,7 @@ Apply Rent Relief
 
 <!-- EXCEL AUDIT -->
 
-<div id="bulk" class="tab-content" style="display:none">
+<div id="bulk" class="tab-content">
 
 <div class="card">
 
@@ -364,21 +375,18 @@ Download Excel Template
 
 <div class="template-note">
 
-Template Columns Required:
+<strong>Template Columns Required:</strong><br>
 
-Employee Name  
-Gross Salary  
-Pension  
-NHF  
-NHIS  
-Rent  
-Renting (Yes/No)  
-PAYE Deducted  
+Employee Name<br>
+Gross Salary<br>
+Pension<br>
+NHF<br>
+NHIS<br>
+Rent<br>
+Renting (Yes/No)<br>
+PAYE Deducted<br><br>
 
-<br><br>
-
-Rent relief is applied only where the employee confirms renting in accordance with the  
-:contentReference[oaicite:0]{index=0}.
+Rent relief is applied only where the employee confirms renting in accordance with the Personal Income Tax Act (PITA).
 
 </div>
 
@@ -402,9 +410,13 @@ Download Processed Excel
 
 function openTab(id,el){
 
-document.querySelectorAll(".tab-content").forEach(t=>t.style.display="none")
+document.querySelectorAll(".tab-content").forEach(t=>{
+t.style.display="none"
+t.classList.remove("active")
+})
 
 document.getElementById(id).style.display="block"
+document.getElementById(id).classList.add("active")
 
 document.querySelectorAll(".menu div").forEach(m=>m.classList.remove("active"))
 
