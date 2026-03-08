@@ -13,20 +13,48 @@
 
 <style>
 
+/* ================= COLOR SYSTEM ================= */
+
+:root{
+
+--primary:#1E40AF;
+--primary-hover:#3B82F6;
+
+--accent:#10B981;
+
+--warning:#F59E0B;
+
+--danger:#EF4444;
+
+--bg-main:#F8FAFC;
+
+--bg-card:#FFFFFF;
+
+--bg-soft:#F1F5F9;
+
+--text-main:#1F2937;
+
+--text-muted:#6B7280;
+
+}
+
+/* ================= GLOBAL ================= */
+
 body{
 font-family:'Inter',sans-serif;
 margin:0;
-background:#f8fafc;
+background:var(--bg-main);
+color:var(--text-main);
 }
 
-/* NAVBAR */
+/* ================= NAVBAR ================= */
 
 .nav{
 display:flex;
 justify-content:space-between;
 align-items:center;
 padding:16px 8%;
-background:white;
+background:var(--bg-card);
 box-shadow:0 2px 10px rgba(0,0,0,.05);
 }
 
@@ -37,11 +65,11 @@ font-size:18px;
 
 .back{
 text-decoration:none;
-color:#2563eb;
+color:var(--primary);
 font-weight:600;
 }
 
-/* DASHBOARD GRID */
+/* ================= DASHBOARD GRID ================= */
 
 .dashboard{
 display:grid;
@@ -49,10 +77,10 @@ grid-template-columns:260px 1fr;
 min-height:100vh;
 }
 
-/* SIDEBAR */
+/* ================= SIDEBAR ================= */
 
 .sidebar{
-background:white;
+background:var(--bg-card);
 border-right:1px solid #e5e7eb;
 padding:20px;
 }
@@ -66,44 +94,58 @@ padding:10px;
 border-radius:8px;
 cursor:pointer;
 margin-bottom:8px;
+transition:0.2s;
 }
 
 .menu div:hover{
-background:#f1f5f9;
+background:var(--bg-soft);
 }
 
 .menu .active{
-background:#2563eb;
+background:var(--primary);
 color:white;
 }
 
-/* MAIN AREA */
+/* ================= MAIN AREA ================= */
 
 .main{
 padding:30px;
 }
 
 .card{
-background:white;
+background:var(--bg-card);
 padding:24px;
-border-radius:14px;
-box-shadow:0 10px 25px rgba(0,0,0,.05);
+border-radius:16px;
+box-shadow:0 10px 25px rgba(0,0,0,.06);
 margin-bottom:20px;
 }
 
+/* ================= BUTTONS ================= */
+
 button{
-background:#2563eb;
+background:var(--primary);
 border:none;
 color:white;
 padding:12px;
 border-radius:10px;
 cursor:pointer;
 margin-top:10px;
+transition:0.2s;
+}
+
+button:hover{
+background:var(--primary-hover);
 }
 
 button.camera{
-background:#0f766e;
+background:var(--accent);
 }
+
+button.camera:hover{
+background:#059669;
+}
+
+/* ================= INPUT ================= */
 
 input{
 width:100%;
@@ -111,14 +153,19 @@ padding:10px;
 margin-top:8px;
 border-radius:8px;
 border:1px solid #e5e7eb;
+font-size:14px;
 }
+
+/* ================= RESULT PANEL ================= */
 
 .result{
 margin-top:15px;
-background:#f1f5f9;
+background:var(--bg-soft);
 padding:14px;
 border-radius:10px;
 }
+
+/* ================= RENT RELIEF ================= */
 
 .relief{
 background:#eef6ff;
@@ -133,15 +180,49 @@ gap:8px;
 margin-top:10px;
 }
 
+/* ================= ALERTS ================= */
+
+.success{
+background:#ECFDF5;
+color:#047857;
+padding:10px;
+border-radius:8px;
+}
+
+.warning{
+background:#FFFBEB;
+color:#92400E;
+padding:10px;
+border-radius:8px;
+}
+
+.error{
+background:#FEF2F2;
+color:#991B1B;
+padding:10px;
+border-radius:8px;
+}
+
+/* ================= TABLE ================= */
+
 table{
 width:100%;
 border-collapse:collapse;
 margin-top:15px;
 }
 
+th{
+background:var(--bg-soft);
+text-align:left;
+}
+
 th,td{
 border:1px solid #e5e7eb;
 padding:8px;
+}
+
+tr:hover{
+background:#E2E8F0;
 }
 
 </style>
@@ -284,9 +365,11 @@ Download Processed Excel
 function openTab(id,el){
 
 document.querySelectorAll(".tab-content").forEach(t=>t.style.display="none")
+
 document.getElementById(id).style.display="block"
 
 document.querySelectorAll(".menu div").forEach(m=>m.classList.remove("active"))
+
 el.classList.add("active")
 
 }
