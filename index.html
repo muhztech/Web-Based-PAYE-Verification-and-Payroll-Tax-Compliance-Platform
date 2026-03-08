@@ -39,8 +39,11 @@
 body{
 font-family:'Inter',sans-serif;
 margin:0;
-background:var(--bg-main);
+background:linear-gradient(135deg,#f0f9ff,#eef2ff,#f8fafc);
 color:var(--text-main);
+min-height:100vh;
+display:flex;
+flex-direction:column;
 }
 
 /* ================= NAVBAR ================= */
@@ -57,6 +60,7 @@ box-shadow:0 4px 10px rgba(0,0,0,.05);
 .logo{
 font-size:20px;
 font-weight:700;
+color:var(--primary);
 }
 
 .start-btn{
@@ -77,7 +81,8 @@ background:var(--primary-hover);
 
 .hero{
 text-align:center;
-padding:80px 20px;
+padding:90px 20px;
+background:linear-gradient(180deg,rgba(59,130,246,0.08),rgba(16,185,129,0.05));
 }
 
 .hero h1{
@@ -120,12 +125,21 @@ background:var(--bg-card);
 padding:26px;
 border-radius:16px;
 box-shadow:0 10px 25px rgba(0,0,0,.05);
-transition:0.2s;
+transition:0.25s;
+border-top:4px solid var(--primary);
+}
+
+.card:nth-child(2){
+border-top:4px solid var(--accent);
+}
+
+.card:nth-child(3){
+border-top:4px solid var(--warning);
 }
 
 .card:hover{
-transform:translateY(-4px);
-box-shadow:0 14px 30px rgba(0,0,0,.08);
+transform:translateY(-6px);
+box-shadow:0 18px 35px rgba(0,0,0,.1);
 }
 
 .card h3{
@@ -139,7 +153,7 @@ color:var(--text-muted);
 /* ================= HOW IT WORKS ================= */
 
 .how{
-background:var(--bg-soft);
+background:linear-gradient(135deg,#eef2ff,#ecfeff);
 padding:60px 8%;
 text-align:center;
 }
@@ -156,14 +170,26 @@ background:var(--bg-card);
 padding:20px;
 border-radius:12px;
 box-shadow:0 6px 15px rgba(0,0,0,.04);
+border-left:4px solid var(--primary);
 }
 
 /* ================= FOOTER ================= */
 
 .footer{
 text-align:center;
-padding:30px;
-color:var(--text-muted);
+padding:40px 20px;
+margin-top:auto;
+background:#111827;
+color:#9CA3AF;
+font-size:14px;
+}
+
+.brand{
+margin-top:10px;
+font-weight:600;
+color:#10B981;
+font-size:15px;
+letter-spacing:0.5px;
 }
 
 </style>
@@ -253,6 +279,11 @@ Apply rent relief under the Personal Income Tax Act (Nigeria) and check if PAYE 
 
 <div class="footer">
 PAYE Compliance • Payroll Audit • PIT Calculator
+
+<div class="brand">
+Built by Mudris Tech Solution 🚀
+</div>
+
 </div>
 
 </body>
