@@ -9,21 +9,48 @@
 
 <style>
 
+/* ================= COLOR SYSTEM ================= */
+
+:root{
+
+--primary:#1E40AF;
+--primary-hover:#3B82F6;
+
+--accent:#10B981;
+
+--warning:#F59E0B;
+
+--danger:#EF4444;
+
+--bg-main:#F8FAFC;
+
+--bg-card:#FFFFFF;
+
+--bg-soft:#F1F5F9;
+
+--text-main:#1F2937;
+
+--text-muted:#6B7280;
+
+}
+
+/* ================= GLOBAL ================= */
+
 body{
 font-family:'Inter',sans-serif;
 margin:0;
-background:#f8fafc;
-color:#1f2937;
+background:var(--bg-main);
+color:var(--text-main);
 }
 
-/* NAVBAR */
+/* ================= NAVBAR ================= */
 
 .nav{
 display:flex;
 justify-content:space-between;
 align-items:center;
 padding:20px 8%;
-background:white;
+background:var(--bg-card);
 box-shadow:0 4px 10px rgba(0,0,0,.05);
 }
 
@@ -33,15 +60,20 @@ font-weight:700;
 }
 
 .start-btn{
-background:#2563eb;
+background:var(--primary);
 color:white;
 padding:10px 18px;
 border-radius:8px;
 text-decoration:none;
 font-weight:600;
+transition:0.2s;
 }
 
-/* HERO */
+.start-btn:hover{
+background:var(--primary-hover);
+}
+
+/* ================= HERO ================= */
 
 .hero{
 text-align:center;
@@ -54,22 +86,27 @@ margin-bottom:10px;
 }
 
 .hero p{
-color:#6b7280;
+color:var(--text-muted);
 font-size:18px;
 margin-bottom:30px;
 }
 
 .hero button{
-background:#2563eb;
+background:var(--primary);
 color:white;
 border:none;
 padding:14px 26px;
 border-radius:10px;
 font-size:16px;
 cursor:pointer;
+transition:0.2s;
 }
 
-/* FEATURES */
+.hero button:hover{
+background:var(--primary-hover);
+}
+
+/* ================= FEATURES ================= */
 
 .features{
 display:grid;
@@ -79,10 +116,16 @@ padding:60px 8%;
 }
 
 .card{
-background:white;
+background:var(--bg-card);
 padding:26px;
 border-radius:16px;
 box-shadow:0 10px 25px rgba(0,0,0,.05);
+transition:0.2s;
+}
+
+.card:hover{
+transform:translateY(-4px);
+box-shadow:0 14px 30px rgba(0,0,0,.08);
 }
 
 .card h3{
@@ -90,13 +133,13 @@ margin-top:10px;
 }
 
 .card p{
-color:#6b7280;
+color:var(--text-muted);
 }
 
-/* HOW IT WORKS */
+/* ================= HOW IT WORKS ================= */
 
 .how{
-background:#eef2ff;
+background:var(--bg-soft);
 padding:60px 8%;
 text-align:center;
 }
@@ -109,17 +152,18 @@ margin-top:30px;
 }
 
 .step{
-background:white;
+background:var(--bg-card);
 padding:20px;
 border-radius:12px;
+box-shadow:0 6px 15px rgba(0,0,0,.04);
 }
 
-/* FOOTER */
+/* ================= FOOTER ================= */
 
 .footer{
 text-align:center;
 padding:30px;
-color:#6b7280;
+color:var(--text-muted);
 }
 
 </style>
@@ -127,14 +171,14 @@ color:#6b7280;
 
 <body>
 
-<!-- NAVBAR -->
+<!-- ================= NAVBAR ================= -->
 
 <div class="nav">
 <div class="logo">🇳🇬 PAYE Compliance Tool</div>
 <a href="app.html" class="start-btn">Launch Tool</a>
 </div>
 
-<!-- HERO -->
+<!-- ================= HERO ================= -->
 
 <div class="hero">
 
@@ -151,7 +195,7 @@ Start PAYE Audit
 
 </div>
 
-<!-- FEATURES -->
+<!-- ================= FEATURES ================= -->
 
 <div class="features">
 
@@ -182,7 +226,7 @@ and check if tax was over-deducted.
 
 </div>
 
-<!-- HOW IT WORKS -->
+<!-- ================= HOW IT WORKS ================= -->
 
 <div class="how">
 
@@ -209,7 +253,7 @@ and check if tax was over-deducted.
 
 </div>
 
-<!-- FOOTER -->
+<!-- ================= FOOTER ================= -->
 
 <div class="footer">
 PAYE Compliance • Payroll Audit • PIT Calculator
