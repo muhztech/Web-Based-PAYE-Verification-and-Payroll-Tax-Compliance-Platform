@@ -16,16 +16,26 @@
 /* ================= COLOR SYSTEM ================= */
 
 :root{
+
 --primary:#1E40AF;
 --primary-hover:#3B82F6;
+
 --accent:#10B981;
+
 --warning:#F59E0B;
+
 --danger:#EF4444;
+
 --bg-main:#F8FAFC;
+
 --bg-card:#FFFFFF;
+
 --bg-soft:#F1F5F9;
+
 --text-main:#1F2937;
+
 --text-muted:#6B7280;
+
 }
 
 /* ================= GLOBAL ================= */
@@ -135,6 +145,14 @@ button.camera:hover{
 background:#059669;
 }
 
+button.template{
+background:#6366F1;
+}
+
+button.template:hover{
+background:#4F46E5;
+}
+
 /* ================= INPUT ================= */
 
 input{
@@ -215,10 +233,10 @@ tr:hover{
 background:#E2E8F0;
 }
 
-.note{
+.template-note{
 margin-top:10px;
-font-size:13px;
 color:var(--text-muted);
+font-size:13px;
 }
 
 </style>
@@ -255,7 +273,7 @@ color:var(--text-muted);
 
 <!-- OCR TOOL -->
 
-<div id="compare" class="tab-content">
+<div id="compare" class="tab-content active">
 
 <div class="card">
 
@@ -334,32 +352,41 @@ Apply Rent Relief
 
 <div class="card">
 
-<h3>📊 Payroll Excel Audit</h3>
-
-<button onclick="downloadTemplate()">
-Download Excel Template
-</button>
-
-<div class="note">
-Template columns required:<br>
-Employee Name | Gross Salary | Pension | NHF | NHIS | Rent | Renting (Yes/No) | Old PAYE
-</div>
+<h3>Payroll Excel Audit</h3>
 
 <input type="file" id="excelFile" accept=".xlsx">
 
-<button onclick="processExcel()">
-Process Payroll
+<button onclick="processExcel()">Process Payroll</button>
+
+<button class="template" onclick="downloadTemplate()">
+Download Excel Template
 </button>
+
+<div class="template-note">
+
+Template Columns Required:
+
+Employee Name  
+Gross Salary  
+Pension  
+NHF  
+NHIS  
+Rent  
+Renting (Yes/No)  
+PAYE Deducted  
+
+<br><br>
+
+Rent relief is applied only where the employee confirms renting in accordance with the  
+:contentReference[oaicite:0]{index=0}.
+
+</div>
 
 <div id="excelPreview"></div>
 
 <button id="downloadBtn" onclick="downloadExcel()" style="display:none">
 Download Processed Excel
 </button>
-
-<div class="note">
-Rent relief is applied only where the employee confirms they are renting in accordance with the Personal Income Tax Act.
-</div>
 
 </div>
 
@@ -382,6 +409,42 @@ document.getElementById(id).style.display="block"
 document.querySelectorAll(".menu div").forEach(m=>m.classList.remove("active"))
 
 el.classList.add("active")
+
+}
+
+/* ================= DOWNLOAD TEMPLATE ================= */
+
+function downloadTemplate(){
+
+const headers = [
+"Employee Name",
+"Gross Salary",
+"Pension",
+"NHF",
+"NHIS",
+"Rent",
+"Renting",
+"PAYE Deducted"
+]
+
+const exampleRow = [
+"John Doe",
+350000,
+28000,
+8750,
+5000,
+120000,
+"Yes",
+46000
+]
+
+const worksheet = XLSX.utils.aoa_to_sheet([headers,exampleRow])
+
+const workbook = XLSX.utils.book_new()
+
+XLSX.utils.book_append_sheet(workbook,worksheet,"Payroll")
+
+XLSX.writeFile(workbook,"PAYE_Payroll_Template.xlsx")
 
 }
 
