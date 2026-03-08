@@ -274,7 +274,7 @@ function applyRentRelief() {
   `;
 }
 
-/* ================= OPTIMIZED PDF OCR ================= */
+/* ================= PDF OCR ================= */
 
 async function convertPDFtoImage(file) {
 
@@ -363,7 +363,7 @@ function calculatePIT() {
     `<b>Monthly PIT:</b> ₦${newPAYE.toLocaleString()}`;
 }
 
-/* ================= EXCEL PROCESS ================= */
+/* ================= EXCEL PROCESS (UPGRADED) ================= */
 
 function processExcel() {
 
@@ -392,14 +392,49 @@ function processExcel() {
       const nhf = Number(r["NHF"]) || 0;
       const nhis = Number(r["NHIS"]) || 0;
       const other = Number(r["Other Deductions"]) || 0;
+
+      const rent = Number(r["Rent"]) || 0;
+
+      const renting =
+        String(r["Renting (Yes/No)"] || "")
+        .toLowerCase()
+        .trim() === "yes";
+
+      const employerHouse =
+        String(r["Employer Housing"] || "")
+        .toLowerCase()
+        .trim() === "yes";
+
       const oldPAYE = Number(r["Old PAYE"]) || 0;
 
-      const newPAYE = computePAYE(gross, pension, nhf, nhis, other);
+      let reliefMonthly = 0;
+      let compliance = "OK";
+
+      if (renting && !employerHouse) {
+
+        const annualIncome = gross * 12;
+
+        const maxRelief = annualIncome * 0.20;
+
+        const relief = Math.min(rent, maxRelief);
+
+        reliefMonthly = relief / 12;
+
+        if (oldPAYE > computePAYE(gross, pension, nhf, nhis, reliefMonthly)) {
+
+          compliance = "⚠ Over-deduction detected";
+        }
+      }
+
+      const newPAYE =
+        computePAYE(gross, pension, nhf, nhis, other + reliefMonthly);
 
       return {
         ...r,
+        "Rent Relief Applied": Math.round(reliefMonthly),
         "New PAYE": Math.round(newPAYE),
-        "Difference": Math.round(oldPAYE - newPAYE)
+        "Difference": Math.round(oldPAYE - newPAYE),
+        "Compliance Flag": compliance
       };
     });
 
@@ -455,4 +490,3 @@ function downloadExcel() {
 
   XLSX.writeFile(wb, "Processed_PAYE.xlsx");
 }
-
